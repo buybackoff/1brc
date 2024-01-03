@@ -32,8 +32,8 @@ namespace _1brc
 
         public override int GetHashCode()
         {
-            // if (_len > 7)
-            //     return HashCode.Combine(*(int*)_pointer, *(int*)(_pointer + 4));
+            if (_len > 7)
+                return HashCode.Combine(*(int*)_pointer, *(int*)(_pointer + 4));
             
             if (_len > 3)
                 return *(int*)_pointer;
