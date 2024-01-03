@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 namespace _1brc
 {
     public struct Summary
@@ -8,11 +10,21 @@ namespace _1brc
         public long Count;
         public double Average => Sum / Count;
 
-        public void Apply(double value, bool isFirst)
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public void Init(double value)
         {
-            if (value < Min || isFirst)
+            Min = value;
+            Max = value;
+            Sum += value;
+            Count++;
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Apply(double value)
+        {
+            if (value < Min)
                 Min = value;
-            if (value > Max || isFirst)
+            else if (value > Max)
                 Max = value;
             Sum += value;
             Count++;

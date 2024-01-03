@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices.JavaScript;
 using System.Text;
 
@@ -7,15 +8,20 @@ namespace _1brc
     {
         private readonly byte* _pointer;
         private readonly int _len;
-
+        
         public Utf8Span(byte* pointer, int len)
         {
             _pointer = pointer;
             _len = len;
         }
 
-        public ReadOnlySpan<byte> Span => new(_pointer, _len);
+        public ReadOnlySpan<byte> Span
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => new(_pointer, _len);
+        }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Equals(Utf8Span other) => Span.SequenceEqual(other.Span);
 
         public override bool Equals(object? obj)

@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Globalization;
 using System.IO.MemoryMappedFiles;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -80,30 +81,33 @@ namespace _1brc
         public Dictionary<Utf8Span, Summary> ProcessChunk(long start, int length)
         {
             var result = new Dictionary<Utf8Span, Summary>();
-            var ptr = _pointer + start;
             
             var pos = 0;
             
             while (pos < length)
             {
-                var sp = new ReadOnlySpan<byte>(ptr + pos, length);
+                var ptr = _pointer + start + pos;
+                
+                var sp = new ReadOnlySpan<byte>(ptr, length);
                 
                 var sepIdx = sp.IndexOf((byte)';');
+
+                ref var summary = ref CollectionsMarshal.GetValueRefOrAddDefault(result, new Utf8Span(ptr, sepIdx), out bool exists);
+
+                sepIdx++;
                 
-                var nameUtf8Sp = new Utf8Span(ptr + pos, sepIdx);
-                
-                ref var summary = ref CollectionsMarshal.GetValueRefOrAddDefault(result, nameUtf8Sp, out bool exists);
-                
-                sp = sp.Slice(sepIdx + 1);
+                sp = sp.Slice(sepIdx);
 
                 var nlIdx = IndexOfNewlineChar(sp, out var stride);
 
-                var valueSp = sp.Slice(0, nlIdx);
-                var value = double.Parse(valueSp);
+                var value = double.Parse(sp.Slice(0, nlIdx), NumberStyles.Float);
                 
-                summary.Apply(value, !exists);
+                if(exists)
+                    summary.Apply(value);
+                else
+                    summary.Init(value);
                 
-                pos += sepIdx + 1 + nlIdx + stride;
+                pos += sepIdx + nlIdx + stride;
             }
 
             return result;
@@ -112,16 +116,17 @@ namespace _1brc
 
         public Dictionary<Utf8Span, Summary> Process()
         {
-            // var tasks = SplitIntoMemoryChunks() // .Skip(1).Take(1)
-            //     .Select(tuple => Task.Run(() => ProcessChunk(tuple.start, tuple.length)))
-            //     .ToList();
-            // var chunks = Task.WhenAll(tasks).Result;
-            
-            var chunks = SplitIntoMemoryChunks()
-                .AsParallel()
-                // .WithDegreeOfParallelism(_threads)
-                .Select((tuple => ProcessChunk(tuple.start, tuple.length)))
+            var tasks = SplitIntoMemoryChunks() // .Skip(1).Take(1)
+                .Select(tuple => Task.Factory.StartNew(() => ProcessChunk(tuple.start, tuple.length), TaskCreationOptions.LongRunning))
                 .ToList();
+            var chunks = Task.WhenAll(tasks).Result;
+
+            // var chunkRanges = SplitIntoMemoryChunks();
+            // var chunks = chunkRanges
+            //     .AsParallel()
+            //     .WithDegreeOfParallelism(chunkRanges.Count)
+            //     .Select((tuple => ProcessChunk(tuple.start, tuple.length)))
+            //     .ToList();
 
             Dictionary<Utf8Span, Summary>? result = null;
 
