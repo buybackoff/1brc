@@ -4,6 +4,7 @@ class Program
 {
     static void Main(string[] args)
     {
-        Console.WriteLine("Hello, World!");
+        using var app = new App("D:/tmp/1brc_1B.txt");
+        app.PrintResult();
     }
 }
