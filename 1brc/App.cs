@@ -188,44 +188,47 @@ namespace _1brc
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static double ParseNaive(ReadOnlySpan<byte> span)
         {
-            // a number is always ASCII with a dot separator
-            bool hasDot = false;
-            
-            double value = 0;
             double mult = 1;
-            int fraction = 0;
+            bool hasDot = false;
+
+            ulong whole = 0;
+            ulong fraction = 0;
+            int fractionCount = 0;
+            
             for (int i = 0; i < span.Length; i++)
             {
                 var c = span[i];
-                
-                if (c == (byte)'-')
+
+                if (c == (byte)'-' && !hasDot && mult == 1 && whole == 0)
                 {
                     mult = -1;
-                    continue;
                 }
-                
-                if (c == (byte)'.')
+                else if (c == (byte)'.' && !hasDot)
                 {
                     hasDot = true;
-                    continue;
                 }
-                
-                if (char.IsDigit((char)c))
+                else if (char.IsDigit((char)c))
                 {
                     var digit = ((char)c - '0');
-                    
+
                     if (hasDot)
                     {
-                        value += digit / Math.Pow(10, ++fraction);
+                        fractionCount++;
+                        fraction = fraction * 10 + (ulong)digit;
                     }
                     else
                     {
-                        value = value * 10 + digit;    
+                        whole = whole * 10 + (ulong)digit;
                     }
+                }
+                else
+                {
+                    // Fallback to the full impl on any irregularity
+                    return double.Parse(span, NumberStyles.Float);
                 }
             }
 
-            return mult * value;
+            return mult * (whole + fraction / Math.Pow(10, fractionCount));
         }
 
         public void Dispose()

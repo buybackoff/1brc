@@ -2,12 +2,13 @@
 
 .NET implementation of https://github.com/gunnarmorling/1brc
 
+Runs in 5.3 seconds on 6 cores i5-12500/64GB RAM/Firecuda 530 (busy machine with 30+GB RAM used and YouTube music playing)
 
 ## Results
 
 **First attempt**
 
-i5-12500/64GB RAM/Firecuda 530 (busy machine with 30+GB RAM used and YouTube music playing)
+Mmap + paralell using Span API and some unsafe tricks to avoid Utf8 parsing until the very end.
 
 ```
 Processed in 00:00:10.6978618
@@ -34,4 +35,13 @@ If we can assume that the float values are well formed then the speed almost dou
 
 ```
 Processed in 00:00:05.5519479
+```
+
+**Optimized double parsing with fallback**
+
+No assumptions are required if we fallback to the full .NET parsing implementation on any irregularity.
+
+```
+Processed in 00:00:05.2944041
+Processed in 00:00:05.3489315
 ```
