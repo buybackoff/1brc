@@ -15,15 +15,15 @@ namespace _1brc
         private readonly byte* _pointer;
         private readonly long _fileLength;
 
-        private readonly int _threads;
+        private readonly int _initialChunkCount;
 
         private const int MaxChunkSize = int.MaxValue - 100_000;
 
         public string FilePath { get; }
 
-        public App(string filePath, int? cpuCount = null)
+        public App(string filePath, int? chunkCount = null)
         {
-            _threads = Math.Max(1, cpuCount ?? Environment.ProcessorCount);
+            _initialChunkCount = Math.Max(1, chunkCount ?? Environment.ProcessorCount);
             FilePath = filePath;
 
             _fileStream = new FileStream(FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 1, FileOptions.None);
@@ -42,11 +42,15 @@ namespace _1brc
         public List<(long start, int length)> SplitIntoMemoryChunks()
         {
             // We want equal chunks not larger than int.MaxValue
-            var chunkCount = _threads;
+            // We want the number of chunks to be a multiple of CPU count, so multiply by 2
+            // Otherwise with CPU_N+1 chunks the last chunk will be processed alone.
+            
+            var chunkCount = _initialChunkCount;
             var chunkSize = _fileLength / chunkCount;
             while (chunkSize > MaxChunkSize)
             {
-                chunkSize = _fileLength / ++chunkCount;
+                chunkCount *= 2; 
+                chunkSize = _fileLength / chunkCount;
             }
 
             List<(long start, int length)> chunks = new();
@@ -115,7 +119,7 @@ namespace _1brc
             
             var chunks = SplitIntoMemoryChunks()
                 .AsParallel()
-                .WithDegreeOfParallelism(_threads)
+                // .WithDegreeOfParallelism(_threads)
                 .Select((tuple => ProcessChunk(tuple.start, tuple.length)))
                 .ToList();
 
