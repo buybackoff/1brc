@@ -10,7 +10,7 @@ namespace _1brc
         public long Count;
         public double Average => Sum / Count;
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Init(double value)
         {
             Min = value;

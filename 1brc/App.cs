@@ -22,6 +22,10 @@ namespace _1brc
 
         public string FilePath { get; }
 
+        private double[] _powersOf10 = new double[64];
+        private GCHandle _powersHandle;
+        private readonly double* _powersPtr;
+
         public App(string filePath, int? chunkCount = null)
         {
             _initialChunkCount = Math.Max(1, chunkCount ?? Environment.ProcessorCount);
@@ -38,6 +42,14 @@ namespace _1brc
 
             _pointer = ptr;
             _fileLength = fileLength;
+
+            for (int i = 0; i < 64; i++)
+            {
+                _powersOf10[i] = Math.Pow(10, i);
+            }
+
+            _powersHandle = GCHandle.Alloc(_powersOf10, GCHandleType.Pinned);
+            _powersPtr = (double*)_powersHandle.AddrOfPinnedObject();
         }
 
         public List<(long start, int length)> SplitIntoMemoryChunks()
@@ -92,7 +104,7 @@ namespace _1brc
 
                 var sepIdx = sp.IndexOf((byte)';');
 
-                ref var summary = ref CollectionsMarshal.GetValueRefOrAddDefault(result, new Utf8Span(ptr, sepIdx), out bool exists);
+                ref var summary = ref CollectionsMarshal.GetValueRefOrAddDefault(result, new Utf8Span(ptr, sepIdx), out var exists);
 
                 sepIdx++;
 
@@ -100,7 +112,6 @@ namespace _1brc
 
                 var nlIdx = IndexOfNewlineChar(sp, out var stride);
 
-                // var value = double.Parse(sp.Slice(0, nlIdx), NumberStyles.Float);
                 var value = ParseNaive(sp.Slice(0, nlIdx));
 
                 if (exists)
@@ -116,17 +127,17 @@ namespace _1brc
 
         public Dictionary<Utf8Span, Summary> Process()
         {
-            var tasks = SplitIntoMemoryChunks() // .Skip(1).Take(1)
-                .Select(tuple => Task.Factory.StartNew(() => ProcessChunk(tuple.start, tuple.length), TaskCreationOptions.LongRunning))
-                .ToList();
-            var chunks = Task.WhenAll(tasks).Result;
-
-            // var chunkRanges = SplitIntoMemoryChunks();
-            // var chunks = chunkRanges
-            //     .AsParallel()
-            //     .WithDegreeOfParallelism(chunkRanges.Count)
-            //     .Select((tuple => ProcessChunk(tuple.start, tuple.length)))
+            // var tasks = SplitIntoMemoryChunks() // .Skip(1).Take(1)
+            //     .Select(tuple => Task.Factory.StartNew(() => ProcessChunk(tuple.start, tuple.length), TaskCreationOptions.LongRunning))
             //     .ToList();
+            // var chunks = Task.WhenAll(tasks).Result;
+
+            var chunkRanges = SplitIntoMemoryChunks();
+            var chunks = chunkRanges
+                .AsParallel()
+                // .WithDegreeOfParallelism(chunkRanges.Count)
+                .Select((tuple => ProcessChunk(tuple.start, tuple.length)))
+                .ToList();
 
             Dictionary<Utf8Span, Summary>? result = null;
 
@@ -155,6 +166,7 @@ namespace _1brc
         {
             var sw = Stopwatch.StartNew();
             var result = Process();
+            Console.WriteLine($"Result count: {result.Count}");
             foreach (KeyValuePair<Utf8Span, Summary> pair in result.OrderBy(x => x.Key.ToString()))
             {
                 Console.WriteLine($"{pair.Key} = {pair.Value}");
@@ -186,7 +198,7 @@ namespace _1brc
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static double ParseNaive(ReadOnlySpan<byte> span)
+        private double ParseNaive(ReadOnlySpan<byte> span)
         {
             double mult = 1;
             bool hasDot = false;
@@ -194,7 +206,7 @@ namespace _1brc
             ulong whole = 0;
             ulong fraction = 0;
             int fractionCount = 0;
-            
+
             for (int i = 0; i < span.Length; i++)
             {
                 var c = span[i];
@@ -228,11 +240,12 @@ namespace _1brc
                 }
             }
 
-            return mult * (whole + fraction / Math.Pow(10, fractionCount));
+            return mult * (whole + fraction / _powersPtr[fractionCount]);
         }
 
         public void Dispose()
         {
+            _powersHandle.Free();
             _vaHandle.Dispose();
             _va.Dispose();
             _mmf.Dispose();

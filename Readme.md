@@ -2,7 +2,7 @@
 
 .NET implementation of https://github.com/gunnarmorling/1brc
 
-Runs in 5.3 seconds on 6 cores i5-12500/64GB RAM/Firecuda 530 (busy machine with 30+GB RAM used and YouTube music playing)
+Runs in 4.8 seconds on 6 cores i5-12500/64GB RAM/Firecuda 530 (busy machine with 30+GB RAM used and YouTube music playing)
 
 ## Results
 
@@ -44,4 +44,13 @@ No assumptions are required if we fallback to the full .NET parsing implementati
 ```
 Processed in 00:00:05.2944041
 Processed in 00:00:05.3489315
+```
+
+**Cache powers of 10, inline summary.init**
+
+```
+Processed in 00:00:04.7363095
+Processed in 00:00:04.8472097
+Processed in 00:00:04.8235814
+Processed in 00:00:04.7163938
 ```
