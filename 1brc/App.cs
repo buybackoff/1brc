@@ -27,7 +27,7 @@ namespace _1brc
             _initialChunkCount = Math.Max(1, chunkCount ?? Environment.ProcessorCount);
             FilePath = filePath;
 
-            _fileStream = new FileStream(FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 1, FileOptions.None);
+            _fileStream = new FileStream(FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 1, FileOptions.SequentialScan);
             var fileLength = _fileStream.Length;
             _mmf = MemoryMappedFile.CreateFromFile(_fileStream, $@"{Path.GetFileName(FilePath)}", fileLength, MemoryMappedFileAccess.Read, HandleInheritability.None, true);
 
@@ -45,12 +45,12 @@ namespace _1brc
             // We want equal chunks not larger than int.MaxValue
             // We want the number of chunks to be a multiple of CPU count, so multiply by 2
             // Otherwise with CPU_N+1 chunks the last chunk will be processed alone.
-            
+
             var chunkCount = _initialChunkCount;
             var chunkSize = _fileLength / chunkCount;
             while (chunkSize > MaxChunkSize)
             {
-                chunkCount *= 2; 
+                chunkCount *= 2;
                 chunkSize = _fileLength / chunkCount;
             }
 
@@ -81,38 +81,38 @@ namespace _1brc
         public Dictionary<Utf8Span, Summary> ProcessChunk(long start, int length)
         {
             var result = new Dictionary<Utf8Span, Summary>();
-            
+
             var pos = 0;
-            
+
             while (pos < length)
             {
                 var ptr = _pointer + start + pos;
-                
+
                 var sp = new ReadOnlySpan<byte>(ptr, length);
-                
+
                 var sepIdx = sp.IndexOf((byte)';');
 
                 ref var summary = ref CollectionsMarshal.GetValueRefOrAddDefault(result, new Utf8Span(ptr, sepIdx), out bool exists);
 
                 sepIdx++;
-                
+
                 sp = sp.Slice(sepIdx);
 
                 var nlIdx = IndexOfNewlineChar(sp, out var stride);
 
-                var value = double.Parse(sp.Slice(0, nlIdx), NumberStyles.Float);
-                
-                if(exists)
+                // var value = double.Parse(sp.Slice(0, nlIdx), NumberStyles.Float);
+                var value = ParseNaive(sp.Slice(0, nlIdx));
+
+                if (exists)
                     summary.Apply(value);
                 else
                     summary.Init(value);
-                
+
                 pos += sepIdx + nlIdx + stride;
             }
 
             return result;
         }
-
 
         public Dictionary<Utf8Span, Summary> Process()
         {
@@ -130,7 +130,7 @@ namespace _1brc
 
             Dictionary<Utf8Span, Summary>? result = null;
 
-            foreach (Dictionary<Utf8Span,Summary> chunk in chunks)
+            foreach (Dictionary<Utf8Span, Summary> chunk in chunks)
             {
                 if (result == null)
                 {
@@ -138,7 +138,7 @@ namespace _1brc
                     continue;
                 }
 
-                foreach (KeyValuePair<Utf8Span,Summary> pair in chunk)
+                foreach (KeyValuePair<Utf8Span, Summary> pair in chunk)
                 {
                     ref var summary = ref CollectionsMarshal.GetValueRefOrAddDefault(result, pair.Key, out bool exists);
                     if (exists)
@@ -150,19 +150,20 @@ namespace _1brc
 
             return result!;
         }
-        
+
         public void PrintResult()
         {
             var sw = Stopwatch.StartNew();
             var result = Process();
-            foreach (KeyValuePair<Utf8Span,Summary> pair in result.OrderBy(x => x.Key.ToString()))
+            foreach (KeyValuePair<Utf8Span, Summary> pair in result.OrderBy(x => x.Key.ToString()))
             {
                 Console.WriteLine($"{pair.Key} = {pair.Value}");
             }
+
             sw.Stop();
             Console.WriteLine($"Processed in {sw.Elapsed}");
         }
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal static int IndexOfNewlineChar(ReadOnlySpan<byte> span, out int stride)
         {
@@ -182,6 +183,49 @@ namespace _1brc
             }
 
             return idx;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static double ParseNaive(ReadOnlySpan<byte> span)
+        {
+            // a number is always ASCII with a dot separator
+            bool hasDot = false;
+            
+            double value = 0;
+            double mult = 1;
+            int fraction = 0;
+            for (int i = 0; i < span.Length; i++)
+            {
+                var c = span[i];
+                
+                if (c == (byte)'-')
+                {
+                    mult = -1;
+                    continue;
+                }
+                
+                if (c == (byte)'.')
+                {
+                    hasDot = true;
+                    continue;
+                }
+                
+                if (char.IsDigit((char)c))
+                {
+                    var digit = ((char)c - '0');
+                    
+                    if (hasDot)
+                    {
+                        value += digit / Math.Pow(10, ++fraction);
+                    }
+                    else
+                    {
+                        value = value * 10 + digit;    
+                    }
+                }
+            }
+
+            return mult * value;
         }
 
         public void Dispose()

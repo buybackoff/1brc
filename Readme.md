@@ -26,3 +26,12 @@ Processed in 00:00:09.7093471
 Float parsing is ~57%, dictionary lookup is ~24%. Optimizing further is about those two things. We may use `csFastFloat` library and a specialized dictionary such as `DictionarySlim`. However the goal is to avoid dependencies even if they are pure .NET.
 
 It's near-perfectly parallelizable though. On 8 cores it should be 33% faster than on 6 that I have. With 32GB RAM the file should be cached by an OS after the first read. The first read may be very slow in the cloud VM, but then the cache should eliminate the difference between drive speeds.
+
+
+**Use naive double parsing**
+
+If we can assume that the float values are well formed then the speed almost doubles.
+
+```
+Processed in 00:00:05.5519479
+```
