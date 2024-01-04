@@ -2,11 +2,17 @@
 
 .NET implementation of https://github.com/gunnarmorling/1brc
 
-Runs in 4.8 seconds on 6 cores i5-12500/64GB RAM/Firecuda 530 (busy machine with 30+GB RAM used and YouTube music playing)
+Runs in 4.25 seconds on 6 cores i5-12500/64GB RAM/Firecuda 530 (busy machine with 30+GB RAM used and YouTube music playing)
 
-Running the top OpenJDK version (`calculate_average_ddimtirov.sh`) locally gives 5.75 secs vs 11.88 reported in the Java repo, so the ratio is x2.07 and my result would scale to **9.9 secs**.
+Running the top OpenJDK version (`calculate_average_ddimtirov.sh`) locally gives 5.75 secs vs 11.88 reported in the Java repo, so the ratio is x2.07 and my result would scale to **8.8 secs**.
+
+> Note that this implementation still uses the default .NET `Dictionary<TKey,TValue>` and makes no assumptions neither about the name or the temperature format or concrete values.The hash function tries to be simple yet generic for most human geo names. Floating point number parsing is still general purpose and does not utilize the fact that there is only a single fractional digit.
+>
+> If the top accepted Java solution uses any additional knowledged about the concrete data set, I will use it. But so far I'm reluctant to do so and do think it's not fair.
 
 ## Results
+
+Below is the evolution of results with each commit.
 
 **First attempt**
 
@@ -66,3 +72,12 @@ Processed in 00:00:04.5303938
 Processed in 00:00:04.5125394
 ```
 
+**Optimize hash function**
+
+See comments in Utf8Span.GetHashCode
+
+```
+Processed in 00:00:04.2237865
+Processed in 00:00:04.2524434
+Processed in 00:00:04.2688423
+```

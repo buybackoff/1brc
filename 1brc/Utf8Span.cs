@@ -32,18 +32,26 @@ namespace _1brc
 
         public override int GetHashCode()
         {
-            if (_len > 7)
-                return HashCode.Combine(*(int*)_pointer, *(int*)(_pointer + 4));
+            // Here we use the first 4 chars (if ASCII) and the length for a hash.
+            // The worst case would be a prefix such as Port/Saint and the same length,
+            // which for human geo names is quite rare. 
+            
+            // .NET dictionary will obviously slow down with collisions but will still work.
+            // If we keep only `*_pointer` the run time is still reasonable ~9 secs.
+            // Just using `if (_len > 0) return (_len * 820243) ^ (*_pointer);` gives 5.8 secs.
+            // By just returning 0 - the worst possible hash function and linear search - the run time is 12x slower at 56 seconds. 
+            
+            // The magic number 820243 is the largest happy prime that contains 2024 from https://prime-numbers.info/list/happy-primes-page-9
             
             if (_len > 3)
-                return *(int*)_pointer;
-
+                return (_len * 820243) ^ (*(int*)_pointer); 
+            
             if (_len > 1)
                 return *(short*)_pointer;
-
+            
             if (_len > 0)
                 return *_pointer;
-
+        
             return 0;
         }
 
