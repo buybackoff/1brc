@@ -4,6 +4,8 @@
 
 Runs in 4.8 seconds on 6 cores i5-12500/64GB RAM/Firecuda 530 (busy machine with 30+GB RAM used and YouTube music playing)
 
+Running the top OpenJDK version (`calculate_average_ddimtirov.sh`) locally gives 5.75 secs vs 11.88 reported in the Java repo, so the ratio is x2.07 and my result would scale to **9.9 secs**.
+
 ## Results
 
 **First attempt**
