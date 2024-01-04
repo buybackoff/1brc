@@ -56,3 +56,13 @@ Processed in 00:00:04.8472097
 Processed in 00:00:04.8235814
 Processed in 00:00:04.7163938
 ```
+
+
+**Microoptimize float parsing, but keep it general purpose**
+
+```
+Processed in 00:00:04.4547973
+Processed in 00:00:04.5303938
+Processed in 00:00:04.5125394
+```
+

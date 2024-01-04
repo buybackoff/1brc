@@ -22,9 +22,20 @@ namespace _1brc
 
         public string FilePath { get; }
 
-        private double[] _powersOf10 = new double[64];
-        private GCHandle _powersHandle;
-        private readonly double* _powersPtr;
+        private static double[] _powersOf10 = new double[64];
+        private static GCHandle _powersHandle;
+        private static readonly double* _powersPtr = Init10Powers();
+
+        private static double* Init10Powers()
+        {
+            for (int i = 0; i < 64; i++)
+            {
+                _powersOf10[i] = 1 / Math.Pow(10, i);
+            }
+
+            _powersHandle = GCHandle.Alloc(_powersOf10, GCHandleType.Pinned);
+            return (double*)_powersHandle.AddrOfPinnedObject();
+        }
 
         public App(string filePath, int? chunkCount = null)
         {
@@ -42,14 +53,6 @@ namespace _1brc
 
             _pointer = ptr;
             _fileLength = fileLength;
-
-            for (int i = 0; i < 64; i++)
-            {
-                _powersOf10[i] = Math.Pow(10, i);
-            }
-
-            _powersHandle = GCHandle.Alloc(_powersOf10, GCHandleType.Pinned);
-            _powersPtr = (double*)_powersHandle.AddrOfPinnedObject();
         }
 
         public List<(long start, int length)> SplitIntoMemoryChunks()
@@ -200,7 +203,7 @@ namespace _1brc
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private double ParseNaive(ReadOnlySpan<byte> span)
         {
-            double mult = 1;
+            double sign = 1;
             bool hasDot = false;
 
             ulong whole = 0;
@@ -209,19 +212,19 @@ namespace _1brc
 
             for (int i = 0; i < span.Length; i++)
             {
-                var c = span[i];
+                var c = (int)span[i];
 
-                if (c == (byte)'-' && !hasDot && mult == 1 && whole == 0)
+                if (c == (byte)'-' && !hasDot && sign == 1 && whole == 0)
                 {
-                    mult = -1;
+                    sign = -1;
                 }
                 else if (c == (byte)'.' && !hasDot)
                 {
                     hasDot = true;
                 }
-                else if (char.IsDigit((char)c))
+                else if ((uint)(c - '0') <= 9)
                 {
-                    var digit = ((char)c - '0');
+                    var digit = c - '0';
 
                     if (hasDot)
                     {
@@ -240,12 +243,11 @@ namespace _1brc
                 }
             }
 
-            return mult * (whole + fraction / _powersPtr[fractionCount]);
+            return sign * (whole + fraction * _powersPtr[fractionCount]);
         }
 
         public void Dispose()
         {
-            _powersHandle.Free();
             _vaHandle.Dispose();
             _va.Dispose();
             _mmf.Dispose();
