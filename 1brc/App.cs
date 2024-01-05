@@ -3,6 +3,7 @@ using System.Globalization;
 using System.IO.MemoryMappedFiles;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Text;
 using Microsoft.Win32.SafeHandles;
 
 namespace _1brc
@@ -25,17 +26,6 @@ namespace _1brc
         private static double[] _powersOf10 = new double[64];
         private static GCHandle _powersHandle;
         private static readonly double* _powersPtr = Init10Powers();
-
-        private static double* Init10Powers()
-        {
-            for (int i = 0; i < 64; i++)
-            {
-                _powersOf10[i] = 1 / Math.Pow(10, i);
-            }
-
-            _powersHandle = GCHandle.Alloc(_powersOf10, GCHandleType.Pinned);
-            return (double*)_powersHandle.AddrOfPinnedObject();
-        }
 
         public App(string filePath, int? chunkCount = null)
         {
@@ -128,55 +118,48 @@ namespace _1brc
             return result;
         }
 
-        public Dictionary<Utf8Span, Summary> Process()
-        {
-            // var tasks = SplitIntoMemoryChunks() // .Skip(1).Take(1)
-            //     .Select(tuple => Task.Factory.StartNew(() => ProcessChunk(tuple.start, tuple.length), TaskCreationOptions.LongRunning))
-            //     .ToList();
-            // var chunks = Task.WhenAll(tasks).Result;
-
-            var chunkRanges = SplitIntoMemoryChunks();
-            var chunks = chunkRanges
+        public Dictionary<Utf8Span, Summary> Process() =>
+            SplitIntoMemoryChunks()
                 .AsParallel()
-                // .WithDegreeOfParallelism(chunkRanges.Count)
                 .Select((tuple => ProcessChunk(tuple.start, tuple.length)))
-                .ToList();
-
-            Dictionary<Utf8Span, Summary>? result = null;
-
-            foreach (Dictionary<Utf8Span, Summary> chunk in chunks)
-            {
-                if (result == null)
+                .ToList()
+                .Aggregate((result, chunk) =>
                 {
-                    result = chunk;
-                    continue;
-                }
+                    foreach (KeyValuePair<Utf8Span, Summary> pair in chunk)
+                    {
+                        ref var summary = ref CollectionsMarshal.GetValueRefOrAddDefault(result, pair.Key, out bool exists);
+                        if (exists)
+                            summary.Apply(pair.Value);
+                        else
+                            summary = pair.Value;
+                    }
 
-                foreach (KeyValuePair<Utf8Span, Summary> pair in chunk)
-                {
-                    ref var summary = ref CollectionsMarshal.GetValueRefOrAddDefault(result, pair.Key, out bool exists);
-                    if (exists)
-                        summary.Apply(pair.Value);
-                    else
-                        summary = pair.Value;
-                }
-            }
-
-            return result!;
-        }
+                    return result;
+                });
 
         public void PrintResult()
         {
-            var sw = Stopwatch.StartNew();
             var result = Process();
-            Console.WriteLine($"Result count: {result.Count}");
-            foreach (KeyValuePair<Utf8Span, Summary> pair in result.OrderBy(x => x.Key.ToString()))
+
+            long count = 0;
+            Console.OutputEncoding = Encoding.UTF8;
+            Console.Write("{");
+            var line = 0;
+            foreach (var pair in result
+                         .Select(x => (Name: x.Key.ToString(), x.Value))
+                         .OrderBy(x => x.Name, StringComparer.InvariantCulture))
             {
-                Console.WriteLine($"{pair.Key} = {pair.Value}");
+                count += pair.Value.Count;
+                Console.Write($"{pair.Name} = {pair.Value}");
+                line++;
+                if (line < result.Count)
+                    Console.Write(", ");
             }
 
-            sw.Stop();
-            Console.WriteLine($"Processed in {sw.Elapsed}");
+            Console.WriteLine("}");
+
+            if (count != 1_000_000_000)
+                Console.WriteLine($"Total row count {count:N0}");
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -252,6 +235,17 @@ namespace _1brc
             _va.Dispose();
             _mmf.Dispose();
             _fileStream.Dispose();
+        }
+
+        private static double* Init10Powers()
+        {
+            for (int i = 0; i < 64; i++)
+            {
+                _powersOf10[i] = 1 / Math.Pow(10, i);
+            }
+
+            _powersHandle = GCHandle.Alloc(_powersOf10, GCHandleType.Pinned);
+            return (double*)_powersHandle.AddrOfPinnedObject();
         }
     }
 }
