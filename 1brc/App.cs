@@ -44,7 +44,7 @@ namespace _1brc
 
             _fileStream = new FileStream(FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 1, FileOptions.SequentialScan);
             var fileLength = _fileStream.Length;
-            _mmf = MemoryMappedFile.CreateFromFile(_fileStream, $@"{Path.GetFileName(FilePath)}", fileLength, MemoryMappedFileAccess.Read, HandleInheritability.None, true);
+            _mmf = MemoryMappedFile.CreateFromFile(FilePath, FileMode.Open);
 
             byte* ptr = (byte*)0;
             _va = _mmf.CreateViewAccessor(0, fileLength, MemoryMappedFileAccess.Read);
