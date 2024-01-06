@@ -86,33 +86,15 @@ namespace _1brc
         public Dictionary<Utf8Span, Summary> ProcessChunk(long start, int length)
         {
             var result = new Dictionary<Utf8Span, Summary>();
+            var remaining = new Utf8Span(_pointer + start, length);
 
-            var pos = 0;
-
-            while (pos < length)
+            while (remaining.Length > 0)
             {
-                var ptr = _pointer + start + pos;
-
-                var sp = new ReadOnlySpan<byte>(ptr, length);
-
-                var sepIdx = sp.IndexOf((byte)';');
-
-                ref var summary = ref CollectionsMarshal.GetValueRefOrAddDefault(result, new Utf8Span(ptr, sepIdx), out var exists);
-
-                sepIdx++;
-
-                sp = sp.Slice(sepIdx);
-
-                var nlIdx = IndexOfNewlineChar(sp, out var stride);
-
-                var value = ParseNaive(sp.Slice(0, nlIdx));
-
-                if (exists)
-                    summary.Apply(value);
-                else
-                    summary.Init(value);
-
-                pos += sepIdx + nlIdx + stride;
+                var idx = remaining.Span.IndexOf((byte)';');
+                ref var summary = ref CollectionsMarshal.GetValueRefOrAddDefault(result, new Utf8Span(remaining.Pointer, idx), out var exists);
+                var value = remaining.ConsumeNumberWithNewLine(idx + 1, out idx);
+                summary.Apply(value, exists);
+                remaining = remaining.SliceUnsafe(idx);
             }
 
             return result;
@@ -129,7 +111,7 @@ namespace _1brc
                     {
                         ref var summary = ref CollectionsMarshal.GetValueRefOrAddDefault(result, pair.Key, out bool exists);
                         if (exists)
-                            summary.Apply(pair.Value);
+                            summary.Merge(pair.Value);
                         else
                             summary = pair.Value;
                     }
@@ -181,52 +163,6 @@ namespace _1brc
             }
 
             return idx;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private double ParseNaive(ReadOnlySpan<byte> span)
-        {
-            double sign = 1;
-            bool hasDot = false;
-
-            ulong whole = 0;
-            ulong fraction = 0;
-            int fractionCount = 0;
-
-            for (int i = 0; i < span.Length; i++)
-            {
-                var c = (int)span[i];
-
-                if (c == (byte)'-' && !hasDot && sign == 1 && whole == 0)
-                {
-                    sign = -1;
-                }
-                else if (c == (byte)'.' && !hasDot)
-                {
-                    hasDot = true;
-                }
-                else if ((uint)(c - '0') <= 9)
-                {
-                    var digit = c - '0';
-
-                    if (hasDot)
-                    {
-                        fractionCount++;
-                        fraction = fraction * 10 + (ulong)digit;
-                    }
-                    else
-                    {
-                        whole = whole * 10 + (ulong)digit;
-                    }
-                }
-                else
-                {
-                    // Fallback to the full impl on any irregularity
-                    return double.Parse(span, NumberStyles.Float);
-                }
-            }
-
-            return sign * (whole + fraction * _powersPtr[fractionCount]);
         }
 
         public void Dispose()

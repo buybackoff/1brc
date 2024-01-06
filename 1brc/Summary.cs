@@ -4,23 +4,32 @@ namespace _1brc
 {
     public struct Summary
     {
-        public double Min;
-        public double Max;
-        public double Sum;
-        public long Count;
-        public double Average => Sum / Count;
+        public int Min;
+        public int Max;
+        public int Sum;
+        public int Count;
+        public double Average => (double)Sum / Count;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Init(double value)
+        public void Apply(int value, bool existing)
+        {
+            if (existing)
+                Apply(value);
+            else
+                Init(value);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Init(int value)
         {
             Min = value;
             Max = value;
-            Sum += value;
-            Count++;
+            Sum = value;
+            Count = 1;
         }
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Apply(double value)
+        public void ApplyX(int value)
         {
             if (value < Min)
                 Min = value;
@@ -30,7 +39,22 @@ namespace _1brc
             Count++;
         }
 
-        public void Apply(Summary other)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Apply(int value)
+        {
+            Min = _min(Min, value);
+            Max = _max(Max, value);
+            Sum += value;
+            Count++;
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            static int _max(int a, int b) => a - ((a - b) & ((a - b) >> 31));
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            static int _min(int a, int b) => b + ((a - b) & ((a - b) >> 31));
+        }
+
+        public void Merge(Summary other)
         {
             if (other.Min < Min)
                 Min = other.Min;
@@ -39,7 +63,7 @@ namespace _1brc
             Sum += other.Sum;
             Count += other.Count;
         }
-        
-        public override string ToString() => $"{Min:N1}/{Average:N1}/{Max:N1}";
+
+        public override string ToString() => $"{Min / 10.0:N1}/{Average / 10.0:N1}/{Max / 10.0:N1}";
     }
 }
