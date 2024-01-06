@@ -1,7 +1,5 @@
 ﻿using System.Diagnostics;
-using System.Globalization;
 using System.IO.MemoryMappedFiles;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Win32.SafeHandles;
@@ -23,16 +21,12 @@ namespace _1brc
 
         public string FilePath { get; }
 
-        private static double[] _powersOf10 = new double[64];
-        private static GCHandle _powersHandle;
-        private static readonly double* _powersPtr = Init10Powers();
-
         public App(string filePath, int? chunkCount = null)
         {
             _initialChunkCount = Math.Max(1, chunkCount ?? Environment.ProcessorCount);
             FilePath = filePath;
 
-            _fileStream = new FileStream(FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 1, FileOptions.SequentialScan);
+            _fileStream = new FileStream(FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 1, FileOptions.RandomAccess);
             var fileLength = _fileStream.Length;
             _mmf = MemoryMappedFile.CreateFromFile(FilePath, FileMode.Open);
 
@@ -42,11 +36,15 @@ namespace _1brc
             _vaHandle.AcquirePointer(ref ptr);
 
             _pointer = ptr;
+
             _fileLength = fileLength;
         }
 
         public List<(long start, int length)> SplitIntoMemoryChunks()
         {
+            var sw = Stopwatch.StartNew();
+            Debug.Assert(_fileStream.Position == 0);
+
             // We want equal chunks not larger than int.MaxValue
             // We want the number of chunks to be a multiple of CPU count, so multiply by 2
             // Otherwise with CPU_N+1 chunks the last chunk will be processed alone.
@@ -72,21 +70,56 @@ namespace _1brc
                 }
 
                 var newPos = pos + chunkSize;
-                var sp = new ReadOnlySpan<byte>(_pointer + newPos, (int)chunkSize);
-                var idx = IndexOfNewlineChar(sp, out var stride);
-                newPos += idx + stride;
+
+                _fileStream.Position = newPos;
+
+                int c;
+                while ((c = _fileStream.ReadByte()) >= 0 && c != '\n')
+                {
+                }
+
+                newPos = _fileStream.Position;
                 var len = newPos - pos;
                 chunks.Add((pos, (int)(len)));
                 pos = newPos;
             }
 
+            var previous = chunks[0];
+            for (int i = 1; i < chunks.Count; i++)
+            {
+                var current = chunks[i];
+
+                if (previous.start + previous.length != current.start)
+                    throw new Exception("Bad chunks");
+
+                if (i == chunks.Count - 1 && current.start + current.length != _fileLength)
+                    throw new Exception("Bad last chunks");
+
+                previous = current;
+            }
+
+            _fileStream.Position = 0;
+
+            sw.Stop();
+            Debug.WriteLine($"CHUNKS {sw.Elapsed}");
             return chunks;
         }
 
         public Dictionary<Utf8Span, Summary> ProcessChunk(long start, int length)
         {
+            // Console.WriteLine($"{start};{length}");
+            // return new Dictionary<Utf8Span, Summary>();
+            // using var va = _mmf.CreateViewAccessor(start, length, MemoryMappedFileAccess.Read);
+            // using var vaHandle = va.SafeMemoryMappedViewHandle;
+            // byte* ptr = default;
+            // vaHandle.AcquirePointer(ref ptr);
+
+            // long offset = ptr - _pointer;
+            // Debug.Assert(offset == start, $"offset {offset} == start {start}");
+
             var result = new Dictionary<Utf8Span, Summary>(10000);
             var remaining = new Utf8Span(_pointer + start, length);
+            // var str = remaining.ToString();
 
             while (remaining.Length > 0)
             {
@@ -103,6 +136,9 @@ namespace _1brc
         public Dictionary<Utf8Span, Summary> Process() =>
             SplitIntoMemoryChunks()
                 .AsParallel()
+#if DEBUG
+                .WithDegreeOfParallelism(1)
+#endif
                 .Select((tuple => ProcessChunk(tuple.start, tuple.length)))
                 .ToList()
                 .Aggregate((result, chunk) =>
@@ -144,44 +180,12 @@ namespace _1brc
                 Console.WriteLine($"Total row count {count:N0}");
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static int IndexOfNewlineChar(ReadOnlySpan<byte> span, out int stride)
-        {
-            stride = default;
-            int idx = span.IndexOfAny((byte)'\n', (byte)'\r');
-            if ((uint)idx < (uint)span.Length)
-            {
-                stride = 1;
-                if (span[idx] == '\r')
-                {
-                    int nextCharIdx = idx + 1;
-                    if ((uint)nextCharIdx < (uint)span.Length && span[nextCharIdx] == '\n')
-                    {
-                        stride = 2;
-                    }
-                }
-            }
-
-            return idx;
-        }
-
         public void Dispose()
         {
             _vaHandle.Dispose();
             _va.Dispose();
             _mmf.Dispose();
             _fileStream.Dispose();
-        }
-
-        private static double* Init10Powers()
-        {
-            for (int i = 0; i < 64; i++)
-            {
-                _powersOf10[i] = 1 / Math.Pow(10, i);
-            }
-
-            _powersHandle = GCHandle.Alloc(_powersOf10, GCHandleType.Pinned);
-            return (double*)_powersHandle.AddrOfPinnedObject();
         }
     }
 }
