@@ -29,29 +29,26 @@ namespace _1brc
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void ApplyX(int value)
-        {
-            if (value < Min)
-                Min = value;
-            else if (value > Max)
-                Max = value;
-            Sum += value;
-            Count++;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Apply(int value)
         {
-            Min = _min(Min, value);
-            Max = _max(Max, value);
+            Min = GetMin(Min, value);
+            Max = GetMax(Max, value);
             Sum += value;
             Count++;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            static int _max(int a, int b) => a - ((a - b) & ((a - b) >> 31));
+            static int GetMin(int a, int b)
+            {
+                int delta = a - b;
+                return b + (delta & (delta >> 31));
+            }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            static int _min(int a, int b) => b + ((a - b) & ((a - b) >> 31));
+            static int GetMax(int a, int b)
+            {
+                int delta = a - b;
+                return a - (delta & (delta >> 31));
+            }
         }
 
         public void Merge(Summary other)

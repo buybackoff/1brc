@@ -68,24 +68,7 @@ namespace _1brc
             if (Length > 1)
                 return *(short*)Pointer;
 
-            if (Length > 0)
-                return *Pointer;
-
-            return 0;
-        }
-
-        public short GetShortHashCode()
-        {
-            if (Length > 3)
-                return (short)((Length * 820243) ^ (*(int*)Pointer));
-
-            if (Length > 1)
-                return *(short*)Pointer;
-
-            if (Length > 0)
-                return *Pointer;
-
-            return 0;
+            return *Pointer;
         }
 
         public override string ToString() => new((sbyte*)Pointer, 0, Length, Encoding.UTF8);
