@@ -18,7 +18,7 @@ _The performance is measured on an idle 6C/12T Alder Lake CPU fixed at 2.5 GHz (
 **Jan 6, 6 PM UTC**
  * The top two Java results (reported as `< 8.0`): **~4.1 sec**
  * This code: **4.59 sec** 🥉
- * Current No 3 Java (`9.625`): **4.75 sec**
+ * Current No 3 Java (`9.625`): **4.75 sec** (Graal JVM), **4.83 sec** (Graal native image)
 
 ## Evolution
 
