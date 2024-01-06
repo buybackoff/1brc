@@ -73,8 +73,8 @@ namespace _1brc
 
                 var newPos = pos + chunkSize;
                 var sp = new ReadOnlySpan<byte>(_pointer + newPos, (int)chunkSize);
-                var idx = IndexOfNewlineChar(sp, out var stride);
-                newPos += idx + stride;
+                var idx = IndexOfNewlineChar(sp);
+                newPos += idx;
                 var len = newPos - pos;
                 chunks.Add((pos, (int)(len)));
                 pos = newPos;
@@ -145,21 +145,12 @@ namespace _1brc
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static int IndexOfNewlineChar(ReadOnlySpan<byte> span, out int stride)
+        internal static int IndexOfNewlineChar(ReadOnlySpan<byte> span)
         {
-            stride = default;
-            int idx = span.IndexOfAny((byte)'\n', (byte)'\r');
+            int idx = span.IndexOf((byte)'\n');
             if ((uint)idx < (uint)span.Length)
             {
-                stride = 1;
-                if (span[idx] == '\r')
-                {
-                    int nextCharIdx = idx + 1;
-                    if ((uint)nextCharIdx < (uint)span.Length && span[nextCharIdx] == '\n')
-                    {
-                        stride = 2;
-                    }
-                }
+                idx++;
             }
 
             return idx;
