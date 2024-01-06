@@ -8,6 +8,7 @@
         <Nullable>enable</Nullable>
         <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
         <PublishAot>true</PublishAot>
+        <OptimizationPreference>Speed</OptimizationPreference>
     </PropertyGroup>
 
 </Project>
