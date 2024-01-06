@@ -85,7 +85,7 @@ namespace _1brc
 
         public Dictionary<Utf8Span, Summary> ProcessChunk(long start, int length)
         {
-            var result = new Dictionary<Utf8Span, Summary>();
+            var result = new Dictionary<Utf8Span, Summary>(10000);
             var remaining = new Utf8Span(_pointer + start, length);
 
             while (remaining.Length > 0)
