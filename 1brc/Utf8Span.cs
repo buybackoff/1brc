@@ -98,34 +98,29 @@ namespace _1brc
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal int IndexOf(int start, byte value)
         {
-            int offset = 0;
-            
             if (Avx2.IsSupported)
             {
-                Vector<byte> vec = default;
-                
-                for (var i = 0; i < int.MaxValue; i++)
+                Vector<byte> vec;
+
+                while (true)
                 {
-                    offset = Vector<byte>.Count * i;
-                    if(start + offset >= Length)
-                        goto BAIL;
-                    var data = Unsafe.ReadUnaligned<Vector<byte>>(Pointer + start + offset);
+                    if (start + Vector<byte>.Count >= Length)
+                        goto FALLBACK;
+                    var data = Unsafe.ReadUnaligned<Vector<byte>>(Pointer + start);
                     vec = Vector.Equals(data, new Vector<byte>(value));
                     if (!vec.Equals(Vector<byte>.Zero))
                         break;
+                    start += Vector<byte>.Count;
                 }
 
                 var matches = vec.AsVector256();
                 var mask = Avx2.MoveMask(matches);
                 int tzc = BitOperations.TrailingZeroCount((uint)mask);
-                return start + offset + tzc;
-                
-                BAIL:
-                offset -= Vector<byte>.Count;
+                return start + tzc;
             }
 
-            start += offset;
-            
+            FALLBACK:
+
             int indexOf = SliceUnsafe(start).Span.IndexOf(value);
             return indexOf < 0 ? Length : start + indexOf;
         }
