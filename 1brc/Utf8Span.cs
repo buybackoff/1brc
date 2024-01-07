@@ -7,7 +7,6 @@ using System.Text;
 
 namespace _1brc
 {
-    [SkipLocalsInit]
     public unsafe struct Utf8Span : IEquatable<Utf8Span>
     {
         internal byte* Pointer;
@@ -28,9 +27,7 @@ namespace _1brc
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => new(Pointer, Length);
         }
-
-        // public Utf8SpanLineEnumerator EnumerateLines() => new Utf8SpanLineEnumerator(this);
-
+        
         /// <summary>
         /// Slice without bound checks. Use only when the bounds are checked/ensured before the call.
         /// </summary>

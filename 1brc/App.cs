@@ -157,7 +157,7 @@ namespace _1brc
             var line = 0;
             foreach (var pair in result
                          .Select(x => (Name: x.Key.ToString(), x.Value))
-                         .OrderBy(x => x.Name, StringComparer.InvariantCulture))
+                         .OrderBy(x => x.Name, StringComparer.Ordinal))
             {
                 count += pair.Value.Count;
                 Console.Write($"{pair.Name} = {pair.Value}");

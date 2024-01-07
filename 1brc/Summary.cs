@@ -4,10 +4,11 @@ namespace _1brc
 {
     public struct Summary
     {
+        public long Sum;
+        public int Count;
         public int Min;
         public int Max;
-        public int Sum;
-        public int Count;
+        
         public double Average => (double)Sum / Count;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -22,20 +23,20 @@ namespace _1brc
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Init(int value)
         {
-            Min = value;
-            Max = value;
             Sum = value;
             Count = 1;
+            Min = value;
+            Max = value;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Apply(int value)
         {
-            Min = GetMin(Min, value);
-            Max = GetMax(Max, value);
             Sum += value;
             Count++;
-
+            Min = GetMin(Min, value);
+            Max = GetMax(Max, value);
+            
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             static int GetMin(int a, int b)
             {
