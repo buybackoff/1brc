@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System.Buffers;
+using System.Diagnostics;
 using System.IO.MemoryMappedFiles;
 using System.Text;
 using Microsoft.Win32.SafeHandles;
@@ -43,7 +44,6 @@ namespace _1brc
 
         public List<(long start, int length)> SplitIntoMemoryChunks()
         {
-            var sw = Stopwatch.StartNew();
             Debug.Assert(_fileStream.Position == 0);
 
             // We want equal chunks not larger than int.MaxValue
@@ -100,9 +100,7 @@ namespace _1brc
             }
 
             _fileStream.Position = 0;
-
-            sw.Stop();
-            Debug.WriteLine($"CHUNKS {sw.Elapsed}");
+            
             return chunks;
         }
 

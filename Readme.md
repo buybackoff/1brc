@@ -18,9 +18,9 @@ Note that his implementation supports `\r\n` line endings. The numbers in the Ev
 > Note: results are very stable, usually only the 2nd decimal changes between the runs.
 
 **.NET**
-* This code: **3.86 sec** (AOT), **4.14 sec** (JIT).
+* This code: **3.73 sec** (AOT), **3.99 sec** (JIT).
 
-**Java**
+**Java (as of Jan 6 evening)**
  * The top two Java results (reported as `< 8.0`): **4.10-4.15 sec**
   * Current No 3 Java (`9.625`): **4.75 sec** (Graal JVM), **4.83 sec** (Graal native image)
 
@@ -130,3 +130,28 @@ Optimize/simplify int parsing between `;`and `.` and use a single digit that is 
 Processed in 00:00:03.0687066
 Processed in 00:00:03.0819551
 ```
+
+#### Use int16 for min/max in Summary
+
+Struct size is 16 👌
+
+
+#### Avoid zero extension, optimize locals & loop
+
+Avoid possible zero extension overhead in ParseInt and Hash, optimize ParseInt locals & loop
+
+Extending `short => int` is more expensive than `short => ushort => uint => int` if all numbers are positive.
+
+ParseInt loop was not good
+
+#### Optimize IndexOf
+
+The initial implementation was lazy with more operations than needed
+
+```
+This includes 3 last changes
+Processed in 00:00:03.0355594
+Processed in 00:00:02.9863322
+Processed in 00:00:03.0102503
+```
+
