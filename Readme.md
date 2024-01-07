@@ -21,11 +21,22 @@ Note that his implementation supports `\r\n` line endings. The numbers in the Ev
 
 | № | JIT           | AOT           | Implementation     | &nbsp;&nbsp;&nbsp;Runtime&nbsp;&nbsp;&nbsp; | Submitter     |
 |---|---------------|---------------|--------------------|---------|---------------|
-| 1.| 00:03.971     | **00:03.725** | **THIS REPO**| linux-x64| [Victor Baybekov](https://github.com/buybackoff)|
+| 1.| 00:03.971     | 00:03.725 | **THIS REPO**| linux-x64| [Victor Baybekov](https://github.com/buybackoff)|
 | 2.| 00:05.979     | 00:06.657     | [link](https://github.com/pedrosakuma/1brc)| linux-x64| [Pedro Travi](https://github.com/pedrosakuma)|
 | 3.| 00:08.079     | 00:08.589     | [link](https://github.com/hexawyz/OneBillionRows)| linux-x64| [Fabien Barbier](https://github.com/hexawyz)|
 
-> For AOT added this properties and `dotnet publish -r linux-x64 -c Release`
+**Java (as of Jan 7, 20:30 UTC)**
+
+| №  | JIT            | &nbsp;&nbsp;&nbsp;AOT&nbsp;&nbsp;&nbsp;       | Implementation     | Runtime | Submitter     |
+|----|----------------|-----------------|--------------------|-----|---------------|
+| 1. | **00:03.108**  | ✖️        | [link](https://github.com/gunnarmorling/1brc/blob/main/src/main/java/dev/morling/onebrc/CalculateAverage_royvanrijn.java)| 21.0.1-graal   | [Roy van Rijn](https://github.com/royvanrijn)|
+| 2. | ✖️             | 00:03.558 | [link](https://github.com/gunnarmorling/1brc/blob/main/src/main/java/dev/morling/onebrc/CalculateAverage_thomaswue.java)| 21.0.1-graal   | [Thomas Wuerthinger](https://github.com/thomaswue)| GraalVM native binary |
+| 3. | 00:04.128      | ✖️        | [link](https://github.com/gunnarmorling/1brc/blob/main/src/main/java/dev/morling/onebrc/CalculateAverage_merykitty.java)| 21.0.1-open   | [Quan Anh Mai](https://github.com/merykitty)|
+| ~  | 03:28.764      | ✖️        | [link](https://github.com/gunnarmorling/onebrc/blob/main/src/main/java/dev/morling/onebrc/CalculateAverage.java) (baseline)| 21.0.1-open   | [Gunnar Morling](https://github.com/gunnarmorling)|
+
+
+
+> For .NET AOT added this properties and `dotnet publish -r linux-x64 -c Release`
 > ```
 ><PublishAot>true</PublishAot>
 ><OptimizationPreference>Speed</OptimizationPreference>
@@ -34,16 +45,6 @@ Note that his implementation supports `\r\n` line endings. The numbers in the Ev
 > ```
 > Interestingly AOT is beneficial for my code but detrimental for the other two versions.
 
-**Java (as of Jan 7 14:30 PM UTC)**
-
-| №  | JIT        | &nbsp;&nbsp;&nbsp;AOT&nbsp;&nbsp;&nbsp;       | Implementation     | Runtime | Submitter     |
-|----|------------|-----------------|--------------------|-----|---------------|
-| 1.*| 00:04.097  | ✖️        | [link](https://github.com/gunnarmorling/1brc/blob/main/src/main/java/dev/morling/onebrc/CalculateAverage_royvanrijn.java)| 21.0.1-graal   | [Roy van Rijn](https://github.com/royvanrijn)|
-| 1.*| 00:04.128  | ✖️        | [link](https://github.com/gunnarmorling/1brc/blob/main/src/main/java/dev/morling/onebrc/CalculateAverage_merykitty.java)| 21.0.1-open   | [Quan Anh Mai](https://github.com/merykitty)|
-| 3. | 00:06.344  | ✖️        | [link](https://github.com/gunnarmorling/1brc/blob/main/src/main/java/dev/morling/onebrc/CalculateAverage_ebarlas.java)| 21.0.1-graal | [Elliot Barlas](https://github.com/ebarlas)|
-| ~  | 03:28.764  | ✖️        | [link](https://github.com/gunnarmorling/onebrc/blob/main/src/main/java/dev/morling/onebrc/CalculateAverage.java) (baseline)| 21.0.1-open   | [Gunnar Morling](https://github.com/gunnarmorling)|
-
-> \* On my machine 1 and 2 places are swapped for Java. The best number is shown in the table instead of an average. However the individual results overlap a lot in a tight range. Therefore I believe it's a tie.
 
 ## Evolution
 
