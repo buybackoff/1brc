@@ -1,13 +1,15 @@
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace _1brc
 {
+    [StructLayout(LayoutKind.Sequential, Size = 16)]
     public struct Summary
     {
         public long Sum;
         public int Count;
-        public int Min;
-        public int Max;
+        public short Min;
+        public short Max;
         
         public double Average => (double)Sum / Count;
 
@@ -25,8 +27,8 @@ namespace _1brc
         {
             Sum = value;
             Count = 1;
-            Min = value;
-            Max = value;
+            Min = (short)value;
+            Max = (short)value;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -34,8 +36,8 @@ namespace _1brc
         {
             Sum += value;
             Count++;
-            Min = GetMin(Min, value);
-            Max = GetMax(Max, value);
+            Min = (short)GetMin(Min, value);
+            Max = (short)GetMax(Max, value);
             
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             static int GetMin(int a, int b)
