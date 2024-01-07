@@ -19,6 +19,9 @@ namespace _1brc
 
         private const int DICT_INIT_CAPACITY = 10000;
         private const int MAX_CHUNK_SIZE = int.MaxValue - 100_000;
+        private const byte SEPARATOR_AS_BYTE = (byte)';';
+        private const byte DOT_AS_BYTE = (byte)'.';
+        private const byte NEW_LINE_AS_BYTE = (byte)'\n';
 
         public string FilePath { get; }
 
@@ -113,9 +116,9 @@ namespace _1brc
 
             while (remaining.Length > 0)
             {
-                var separatorIdx = remaining.IndexOf(0, (byte)';');
-                var dotIdx = remaining.IndexOf(separatorIdx + 1, (byte)'.');
-                var nlIdx = remaining.IndexOf(dotIdx + 1, (byte)'\n');
+                var separatorIdx = remaining.IndexOf(0, SEPARATOR_AS_BYTE);
+                var dotIdx = remaining.IndexOf(separatorIdx + 1, DOT_AS_BYTE);
+                var nlIdx = remaining.IndexOf(dotIdx + 1, NEW_LINE_AS_BYTE);
                         
                 GetValueRefOrAddDefault(result, new Utf8Span(remaining.Pointer, separatorIdx), out var exists)
                     .Apply(remaining.ParseInt(separatorIdx + 1, dotIdx - separatorIdx - 1), exists);
