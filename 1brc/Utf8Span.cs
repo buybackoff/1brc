@@ -1,6 +1,8 @@
-using System.Buffers.Text;
 using System.Diagnostics;
+using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.Intrinsics;
+using System.Runtime.Intrinsics.X86;
 using System.Text;
 
 namespace _1brc
@@ -74,43 +76,60 @@ namespace _1brc
         public override string ToString() => new((sbyte*)Pointer, 0, Length, Encoding.UTF8);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int ConsumeNumberWithNewLine(int start, out int consumed)
+        public int ParseInt(int start, int length)
         {
             int sign = 1;
             int value = 0;
 
             int i = start;
-            for (; i < Length; i++)
+            for (; i < start + length; i++)
             {
                 var c = (int)GetAtUnsafe(i);
 
-                if (c > '9')
-                    break;
-
-                if (c >= '0')
-                {
-                    value = value * 10 + (c - '0');
-                }
+                if (c == '-')
+                    sign = -1;
                 else
-                {
-                    if (c == '-')
-                    {
-                        sign = -1;
-                    }
-                    else if (c == '.' || c < 14)
-                    {
-                        // Skip
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-
+                    value = value * 10 + (c - '0');
             }
 
-            consumed = i;
-            return sign * value;
+            var fractional = GetAtUnsafe(i + 1) - '0';
+            return sign * (value * 10 + fractional); 
+        }
+        
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal int IndexOf(int start, byte value)
+        {
+            int offset = 0;
+            
+            if (Avx2.IsSupported)
+            {
+                Vector<byte> vec = default;
+                
+                for (var i = 0; i < int.MaxValue; i++)
+                {
+                    offset = Vector<byte>.Count * i;
+                    if(start + offset >= Length)
+                        goto BAIL;
+                    var data = Unsafe.ReadUnaligned<Vector<byte>>(Pointer + start + offset);
+                    vec = Vector.Equals(data, new Vector<byte>(value));
+                    if (!vec.Equals(Vector<byte>.Zero))
+                        break;
+                }
+
+                var matches = vec.AsVector256();
+                var mask = Avx2.MoveMask(matches);
+                int tzc = BitOperations.TrailingZeroCount((uint)mask);
+                return start + offset + tzc;
+                
+                BAIL:
+                offset -= Vector<byte>.Count;
+            }
+
+            start += offset;
+            
+            int indexOf = SliceUnsafe(start).Span.IndexOf(value);
+            return indexOf < 0 ? Length : start + indexOf;
         }
     }
 }

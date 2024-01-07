@@ -1,8 +1,8 @@
 ﻿using System.Diagnostics;
 using System.IO.MemoryMappedFiles;
-using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Win32.SafeHandles;
+using static System.Runtime.InteropServices.CollectionsMarshal;
 
 namespace _1brc
 {
@@ -17,7 +17,8 @@ namespace _1brc
 
         private readonly int _initialChunkCount;
 
-        private const int MaxChunkSize = int.MaxValue - 100_000;
+        private const int DICT_INIT_CAPACITY = 10000;
+        private const int MAX_CHUNK_SIZE = int.MaxValue - 100_000;
 
         public string FilePath { get; }
 
@@ -26,7 +27,7 @@ namespace _1brc
             _initialChunkCount = Math.Max(1, chunkCount ?? Environment.ProcessorCount);
             FilePath = filePath;
 
-            _fileStream = new FileStream(FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 1, FileOptions.RandomAccess);
+            _fileStream = new FileStream(FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 1, FileOptions.SequentialScan);
             var fileLength = _fileStream.Length;
             _mmf = MemoryMappedFile.CreateFromFile(FilePath, FileMode.Open);
 
@@ -51,7 +52,7 @@ namespace _1brc
 
             var chunkCount = _initialChunkCount;
             var chunkSize = _fileLength / chunkCount;
-            while (chunkSize > MaxChunkSize)
+            while (chunkSize > MAX_CHUNK_SIZE)
             {
                 chunkCount *= 2;
                 chunkSize = _fileLength / chunkCount;
@@ -107,16 +108,18 @@ namespace _1brc
 
         public Dictionary<Utf8Span, Summary> ProcessChunk(long start, int length)
         {
-            var result = new Dictionary<Utf8Span, Summary>(10000);
+            var result = new Dictionary<Utf8Span, Summary>(DICT_INIT_CAPACITY);
             var remaining = new Utf8Span(_pointer + start, length);
 
             while (remaining.Length > 0)
             {
-                var idx = remaining.Span.IndexOf((byte)';');
-                ref var summary = ref CollectionsMarshal.GetValueRefOrAddDefault(result, new Utf8Span(remaining.Pointer, idx), out var exists);
-                var value = remaining.ConsumeNumberWithNewLine(idx + 1, out idx);
-                summary.Apply(value, exists);
-                remaining = remaining.SliceUnsafe(idx);
+                var separatorIdx = remaining.IndexOf(0, (byte)';');
+                var dotIdx = remaining.IndexOf(separatorIdx + 1, (byte)'.');
+                var nlIdx = remaining.IndexOf(dotIdx + 1, (byte)'\n');
+                        
+                GetValueRefOrAddDefault(result, new Utf8Span(remaining.Pointer, separatorIdx), out var exists)
+                    .Apply(remaining.ParseInt(separatorIdx + 1, dotIdx - separatorIdx - 1), exists);
+                remaining = remaining.SliceUnsafe(nlIdx + 1);
             }
 
             return result;
@@ -134,7 +137,7 @@ namespace _1brc
                 {
                     foreach (KeyValuePair<Utf8Span, Summary> pair in chunk)
                     {
-                        ref var summary = ref CollectionsMarshal.GetValueRefOrAddDefault(result, pair.Key, out bool exists);
+                        ref var summary = ref GetValueRefOrAddDefault(result, pair.Key, out bool exists);
                         if (exists)
                             summary.Merge(pair.Value);
                         else

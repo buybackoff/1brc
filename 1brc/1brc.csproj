@@ -9,6 +9,8 @@
         <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
         <PublishAot>true</PublishAot>
         <OptimizationPreference>Speed</OptimizationPreference>
+        <IlcInstructionSet>native</IlcInstructionSet>
+        <PublishReadyToRun>true</PublishReadyToRun>
     </PropertyGroup>
 
 </Project>

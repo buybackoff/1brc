@@ -112,3 +112,17 @@ Processed in 00:00:03.3463769
 Processed in 00:00:03.3641962
 Processed in 00:00:03.3762491
 ```
+
+
+#### Manual SIMD: find boundaries and simplify parsing
+
+Use AVX2-optimized `IndexOf`.
+
+Find boundaries for `;`, `.` and `\n`.
+
+Optimize/simplify int parsing between `;`and `.` and use a single digit that is always after `.`.
+
+```
+Processed in 00:00:03.0687066
+Processed in 00:00:03.0819551
+```
