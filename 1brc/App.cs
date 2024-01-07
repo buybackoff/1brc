@@ -1,35 +1,42 @@
-﻿using System.Buffers;
-using System.Diagnostics;
+﻿using System.Diagnostics;
+using System.IO.MemoryMappedFiles;
 using System.Runtime.InteropServices;
 using System.Text;
+using Microsoft.Win32.SafeHandles;
 
 namespace _1brc
 {
     public unsafe class App : IDisposable
     {
         private readonly FileStream _fileStream;
+        private readonly MemoryMappedFile _mmf;
+        private readonly MemoryMappedViewAccessor _va;
+        private readonly SafeMemoryMappedViewHandle _vaHandle;
+        private readonly byte* _pointer;
         private readonly long _fileLength;
-        private readonly int _initialChunkCount;
 
-        private readonly Dictionary<string, Summary> _result = new(10000);
+        private readonly int _initialChunkCount;
 
         private const int MaxChunkSize = int.MaxValue - 100_000;
 
         public string FilePath { get; }
 
-        private const int SEGMENT_SIZE = 2 * 1024 * 1024;
-
-        // Refill the buffer when remaining is below than this
-        private const int MIN_REMAINING_SIZE = 1024;
-
         public App(string filePath, int? chunkCount = null)
         {
-            _initialChunkCount =
-                Math.Max(1, chunkCount ?? Environment.ProcessorCount); // For Non-HT CPUs this is probably better to be 2x => do stuff when another thread waits for IO
+            _initialChunkCount = Math.Max(1, chunkCount ?? Environment.ProcessorCount);
             FilePath = filePath;
 
-            _fileStream = new FileStream(FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 1, FileOptions.RandomAccess | FileOptions.Asynchronous);
+            _fileStream = new FileStream(FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 1, FileOptions.RandomAccess);
             var fileLength = _fileStream.Length;
+            _mmf = MemoryMappedFile.CreateFromFile(FilePath, FileMode.Open);
+
+            byte* ptr = (byte*)0;
+            _va = _mmf.CreateViewAccessor(0, fileLength, MemoryMappedFileAccess.Read);
+            _vaHandle = _va.SafeMemoryMappedViewHandle;
+            _vaHandle.AcquirePointer(ref ptr);
+
+            _pointer = ptr;
+
             _fileLength = fileLength;
         }
 
@@ -51,11 +58,6 @@ namespace _1brc
             }
 
             List<(long start, int length)> chunks = new();
-
-#if DEBUG
-            chunks.Add((0, (int)_fileLength));
-            return chunks;
-#endif
 
             long pos = 0;
 
@@ -99,115 +101,63 @@ namespace _1brc
             _fileStream.Position = 0;
 
             sw.Stop();
-            Debug.WriteLine($"CHUNKS: {chunks.Count} chunks in {sw.Elapsed}");
+            Debug.WriteLine($"CHUNKS {sw.Elapsed}");
             return chunks;
         }
 
-        public int ProcessChunk(long start, int length)
+        public Dictionary<Utf8Span, Summary> ProcessChunk(long start, int length)
         {
-            var buffer = ArrayPool<byte>.Shared.Rent(SEGMENT_SIZE);
-            var segmentResult = new Dictionary<Utf8Span, Summary>(10000);
-            var chunkRemaining = length;
+            var result = new Dictionary<Utf8Span, Summary>(10000);
+            var remaining = new Utf8Span(_pointer + start, length);
 
-            var segmentOffset = 0;
-
-            fixed (byte* segmentPtr = &buffer[0])
+            while (remaining.Length > 0)
             {
-                while (chunkRemaining > 0)
-                {
-                    int bufferLength = Math.Min(SEGMENT_SIZE - segmentOffset, chunkRemaining);
-                    var bufferSpan = buffer.AsSpan(segmentOffset, bufferLength);
-
-                    var segmentConsumed = RandomAccess.Read(_fileStream.SafeFileHandle, bufferSpan, start);
-                    chunkRemaining -= segmentConsumed;
-                    start += segmentConsumed;
-
-                    var remaining = new Utf8Span(segmentPtr, segmentOffset + segmentConsumed); // from 0 + copied remainder + segmentConsumed 
-#if DEBUG
-                    var str = remaining.ToString();
-#endif
-
-                    var loopLimit = chunkRemaining == 0 ? 0 : MIN_REMAINING_SIZE;
-
-                    while (remaining.Length > loopLimit)
-                    {
-                        var idx = remaining.Span.IndexOf((byte)';');
-                        ref var summary = ref CollectionsMarshal.GetValueRefOrAddDefault(segmentResult, new Utf8Span(remaining.Pointer, idx), out var exists);
-                        var value = remaining.ConsumeNumberWithNewLine(idx + 1, out idx);
-                        summary.Apply(value, exists);
-                        remaining = remaining.SliceUnsafe(idx);
-                    }
-
-                    DumpSegmentResult(segmentResult);
-
-                    if (chunkRemaining > 0)
-                    {
-                        remaining.Span.CopyTo(buffer); // Copy to the start of the buffer
-                        segmentOffset = remaining.Length;
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
+                var idx = remaining.Span.IndexOf((byte)';');
+                ref var summary = ref CollectionsMarshal.GetValueRefOrAddDefault(result, new Utf8Span(remaining.Pointer, idx), out var exists);
+                var value = remaining.ConsumeNumberWithNewLine(idx + 1, out idx);
+                summary.Apply(value, exists);
+                remaining = remaining.SliceUnsafe(idx);
             }
 
-            ArrayPool<byte>.Shared.Return(buffer);
-
-            return 0;
+            return result;
         }
 
-        private void DumpSegmentResult(Dictionary<Utf8Span, Summary> segmentResult)
-        {
-            lock (_result)
-            {
-                foreach (KeyValuePair<Utf8Span, Summary> pair in segmentResult)
-                {
-                    var keyStr = pair.Key.ToString();
-                    ref var summary = ref CollectionsMarshal.GetValueRefOrAddDefault(_result, keyStr, out bool exists);
-                    if (exists)
-                        summary.Merge(pair.Value);
-                    else
-                        summary = pair.Value;
-                }
-            }
-
-            segmentResult.Clear();
-        }
-
-        public void Process()
-        {
-            // var tasks = SplitIntoMemoryChunks()
-            //     .Select(tuple => Task.Factory.StartNew(() => ProcessChunk(tuple.start, tuple.length), TaskCreationOptions.None))
-            //     .ToList();
-            // Task.WhenAll(tasks).Wait();
-
-            _ = SplitIntoMemoryChunks()
+        public Dictionary<Utf8Span, Summary> Process() =>
+            SplitIntoMemoryChunks()
                 .AsParallel()
 #if DEBUG
                 .WithDegreeOfParallelism(1)
 #endif
                 .Select((tuple => ProcessChunk(tuple.start, tuple.length)))
-                .AsEnumerable()
-                .Sum();
-        }
+                .ToList()
+                .Aggregate((result, chunk) =>
+                {
+                    foreach (KeyValuePair<Utf8Span, Summary> pair in chunk)
+                    {
+                        ref var summary = ref CollectionsMarshal.GetValueRefOrAddDefault(result, pair.Key, out bool exists);
+                        if (exists)
+                            summary.Merge(pair.Value);
+                        else
+                            summary = pair.Value;
+                    }
+
+                    return result;
+                });
 
         public void PrintResult()
         {
-            Process();
+            var result = Process();
 
             long count = 0;
             Console.OutputEncoding = Encoding.UTF8;
             Console.Write("{");
             var line = 0;
-
-            // ReSharper disable once InconsistentlySynchronizedField
-            Dictionary<string, Summary> result = _result;
-
-            foreach (var pair in result.OrderBy(x => x.Key, StringComparer.InvariantCulture))
+            foreach (var pair in result
+                         .Select(x => (Name: x.Key.ToString(), x.Value))
+                         .OrderBy(x => x.Name, StringComparer.InvariantCulture))
             {
                 count += pair.Value.Count;
-                Console.Write($"{pair.Key} = {pair.Value}");
+                Console.Write($"{pair.Name} = {pair.Value}");
                 line++;
                 if (line < result.Count)
                     Console.Write(", ");
@@ -221,6 +171,9 @@ namespace _1brc
 
         public void Dispose()
         {
+            _vaHandle.Dispose();
+            _va.Dispose();
+            _mmf.Dispose();
             _fileStream.Dispose();
         }
     }
