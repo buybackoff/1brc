@@ -96,18 +96,18 @@ namespace _1brc
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal int IndexOf(int start, byte value)
+        internal int IndexOf(int start, byte needle)
         {
             if (Avx2.IsSupported)
             {
+                var needleVec = new Vector<byte>(needle);
                 Vector<byte> vec;
-
                 while (true)
                 {
                     if (start + Vector<byte>.Count >= Length)
                         goto FALLBACK;
                     var data = Unsafe.ReadUnaligned<Vector<byte>>(Pointer + start);
-                    vec = Vector.Equals(data, new Vector<byte>(value));
+                    vec = Vector.Equals(data, needleVec);
                     if (!vec.Equals(Vector<byte>.Zero))
                         break;
                     start += Vector<byte>.Count;
@@ -121,7 +121,7 @@ namespace _1brc
 
             FALLBACK:
 
-            int indexOf = SliceUnsafe(start).Span.IndexOf(value);
+            int indexOf = SliceUnsafe(start).Span.IndexOf(needle);
             return indexOf < 0 ? Length : start + indexOf;
         }
     }
