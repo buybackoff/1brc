@@ -7,10 +7,10 @@ using System.Text;
 
 namespace _1brc
 {
-    public unsafe struct Utf8Span : IEquatable<Utf8Span>
+    public readonly unsafe struct Utf8Span : IEquatable<Utf8Span>
     {
-        internal byte* Pointer;
-        internal int Length;
+        internal readonly byte* Pointer;
+        internal readonly int Length;
 
         public Utf8Span(byte* pointer, int length)
         {

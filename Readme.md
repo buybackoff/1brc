@@ -23,9 +23,10 @@ Note that his implementation supports `\r\n` line endings. The numbers in the Ev
 
 | № | JIT           | AOT           | Implementation     | &nbsp;&nbsp;&nbsp;Runtime&nbsp;&nbsp;&nbsp; | Submitter     |
 |---|---------------|---------------|--------------------|---------|---------------|
-| 1.| 00:03.971     | 00:03.725 | **THIS REPO**| linux-x64| [Victor Baybekov](https://github.com/buybackoff)|
-| 2.| 00:05.979     | 00:06.657     | [link](https://github.com/pedrosakuma/1brc)| linux-x64| [Pedro Travi](https://github.com/pedrosakuma)|
-| 3.| 00:08.079     | 00:08.589     | [link](https://github.com/hexawyz/OneBillionRows)| linux-x64| [Fabien Barbier](https://github.com/hexawyz)|
+| 1.| 00:03.971     | 00:03.725     | **THIS REPO**| linux-x64| [Victor Baybekov](https://github.com/buybackoff)|
+| 2.| 00:04.524     | 00:04.668     | [link](https://github.com/praeclarum/1brc)| linux-x64| [Frank A. Krueger](https://github.com/praeclarum)|
+| 3.| 00:05.979     | 00:06.657     | [link](https://github.com/pedrosakuma/1brc)| linux-x64| [Pedro Travi](https://github.com/pedrosakuma)|
+| 4.| 00:08.079     | 00:08.589     | [link](https://github.com/hexawyz/OneBillionRows)| linux-x64| [Fabien Barbier](https://github.com/hexawyz)|
 
 **Java**
 
