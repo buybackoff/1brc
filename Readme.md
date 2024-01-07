@@ -17,6 +17,8 @@ Note that his implementation supports `\r\n` line endings. The numbers in the Ev
 > 
 > Note: results are very stable, usually only the 2nd decimal changes between the runs.
 
+**As of Jan 7, 20:30 UTC**
+
 **.NET**
 
 | № | JIT           | AOT           | Implementation     | &nbsp;&nbsp;&nbsp;Runtime&nbsp;&nbsp;&nbsp; | Submitter     |
@@ -25,7 +27,7 @@ Note that his implementation supports `\r\n` line endings. The numbers in the Ev
 | 2.| 00:05.979     | 00:06.657     | [link](https://github.com/pedrosakuma/1brc)| linux-x64| [Pedro Travi](https://github.com/pedrosakuma)|
 | 3.| 00:08.079     | 00:08.589     | [link](https://github.com/hexawyz/OneBillionRows)| linux-x64| [Fabien Barbier](https://github.com/hexawyz)|
 
-**Java (as of Jan 7, 20:30 UTC)**
+**Java**
 
 | №  | JIT            | &nbsp;&nbsp;&nbsp;AOT&nbsp;&nbsp;&nbsp;       | Implementation     | Runtime | Submitter     |
 |----|----------------|-----------------|--------------------|-----|---------------|
