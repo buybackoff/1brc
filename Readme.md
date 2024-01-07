@@ -13,16 +13,20 @@ Note that his implementation supports `\r\n` line endings. The numbers in the Ev
 
 ## Results
 
-_The performance is measured on an idle 6C/12T Alder Lake CPU fixed at 2.5 GHz (no turbo), 32GB DDR4 3200, Debian 12 in LXC. At least 5 runs, showing the best result._
+> The performance is measured on an idle 6C/12T Alder Lake CPU fixed at 2.5 GHz (no turbo), 32GB DDR4 3200, Debian 12 in LXC. At least 5 runs, showing the best result.
+> 
+> Note: results are very stable, usually only the 2nd decimal changes between the runs.
 
-**Jan 6, 6 PM UTC**
- * The top two Java results (reported as `< 8.0`): **~4.1 sec**
- * This code: **4.59 sec** 🥉
- * Current No 3 Java (`9.625`): **4.75 sec** (Graal JVM), **4.83 sec** (Graal native image)
+**.NET**
+* This code: **3.86 sec** (AOT), **4.14 sec** (JIT).
+
+**Java**
+ * The top two Java results (reported as `< 8.0`): **4.10-4.15 sec**
+  * Current No 3 Java (`9.625`): **4.75 sec** (Graal JVM), **4.83 sec** (Graal native image)
 
 ## Evolution
 
-Below is the evolution of results with each commit. The time shown here is measured inside the app, on Windows. Using `time` command adds up to `0.5-0.9 sec`. 
+Below is the evolution of results with each commit. The time shown here is measured inside the app, on Windows. Not comparable with `time` command (startup/shutdown time is not measured). 
 
 #### First attempt
 
