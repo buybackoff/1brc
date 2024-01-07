@@ -27,7 +27,7 @@ namespace _1brc
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => new(Pointer, Length);
         }
-        
+
         /// <summary>
         /// Slice without bound checks. Use only when the bounds are checked/ensured before the call.
         /// </summary>
@@ -61,13 +61,15 @@ namespace _1brc
 
             // The magic number 820243 is the largest happy prime that contains 2024 from https://prime-numbers.info/list/happy-primes-page-9
 
+            // Avoid zero-extension when casting to int, go via uint first.
+
             if (Length > 3)
-                return (Length * 820243) ^ (*(int*)Pointer);
+                return (Length * 820243) ^ (int)(*(uint*)Pointer);
 
             if (Length > 1)
-                return *(short*)Pointer;
+                return (int)(uint)(*(ushort*)Pointer);
 
-            return *Pointer;
+            return (int)(uint)*Pointer;
         }
 
         public override string ToString() => new((sbyte*)Pointer, 0, Length, Encoding.UTF8);
@@ -76,24 +78,23 @@ namespace _1brc
         public int ParseInt(int start, int length)
         {
             int sign = 1;
-            int value = 0;
-
-            int i = start;
-            for (; i < start + length; i++)
+            uint value = 0;
+            var end = start + length;
+            
+            for (; start < end; start++)
             {
-                var c = (int)GetAtUnsafe(i);
+                var c = (uint)GetAtUnsafe(start);
 
                 if (c == '-')
                     sign = -1;
                 else
-                    value = value * 10 + (c - '0');
+                    value = value * 10u + (c - '0');
             }
 
-            var fractional = GetAtUnsafe(i + 1) - '0';
-            return sign * (value * 10 + fractional); 
+            var fractional = (uint)GetAtUnsafe(start + 1) - '0';
+            return sign * (int)(value * 10 + fractional);
         }
-        
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal int IndexOf(int start, byte value)
         {
