@@ -113,11 +113,10 @@ namespace _1brc
             {
                 var separatorIdx = remaining.IndexOf(0, (byte)';');
                 var dotIdx = remaining.IndexOf(separatorIdx + 1, (byte)'.');
-                var nlIdx = remaining.IndexOf(dotIdx + 1, (byte)'\n');
                         
                 GetValueRefOrAddDefault(result, new Utf8Span(remaining.Pointer, separatorIdx), out var exists)
                     .Apply(remaining.ParseInt(separatorIdx + 1, dotIdx - separatorIdx - 1), exists);
-                remaining = remaining.SliceUnsafe(nlIdx + 1);
+                remaining = remaining.SliceUnsafe(dotIdx + 3);
             }
 
             return result;
