@@ -25,31 +25,19 @@ This implementation supports `\r\n` line endings. The numbers in the Evolution s
 
 | №  | JIT            | &nbsp;&nbsp;&nbsp;AOT&nbsp;&nbsp;&nbsp;       | Code     | Runtime | Submitter     |
 |----|----------------|-----------------|--------------------|-----|---------------|
-| 1. | **00:03.108**  | ✖️        | [link](https://github.com/gunnarmorling/1brc/blob/main/src/main/java/dev/morling/onebrc/CalculateAverage_royvanrijn.java)| 21.0.1-graal   | [Roy van Rijn](https://github.com/royvanrijn)|
+| 1. | 00:03.108      | ✖️        | [link](https://github.com/gunnarmorling/1brc/blob/main/src/main/java/dev/morling/onebrc/CalculateAverage_royvanrijn.java)| 21.0.1-graal   | [Roy van Rijn](https://github.com/royvanrijn)|
 | 2. | ✖️             | 00:03.558 | [link](https://github.com/gunnarmorling/1brc/blob/main/src/main/java/dev/morling/onebrc/CalculateAverage_thomaswue.java)| 21.0.1-graal   | [Thomas Wuerthinger](https://github.com/thomaswue)| GraalVM native binary |
 | 3. | 00:04.128      | ✖️        | [link](https://github.com/gunnarmorling/1brc/blob/main/src/main/java/dev/morling/onebrc/CalculateAverage_merykitty.java)| 21.0.1-open   | [Quan Anh Mai](https://github.com/merykitty)|
 | ~  | 03:28.764      | ✖️        | [link](https://github.com/gunnarmorling/onebrc/blob/main/src/main/java/dev/morling/onebrc/CalculateAverage.java) (base)| 21.0.1-open   | [Gunnar Morling](https://github.com/gunnarmorling)|
 
 ### Native
 
-> Debian 12 default + build-essential.
-
 | №  | &nbsp;&nbsp;&nbsp;AOT&nbsp;&nbsp;&nbsp;       | Code     | Language | Submitter     | Details |
 |----|-----------------|--------------------|-----|---------------|--------------|
 | ?. | **00:02.644**   | [link](https://github.com/lehuyduc/1brc-simd) | C++   | [lehuyduc](https://github.com/lehuyduc)|  |
-| ?.*| **00:03.902**   | [link](https://github.com/dannyvankooten/1brc) | C    | [Danny van Kooten](https://github.com/dannyvankooten)|[blog](https://www.dannyvankooten.com/blog/2024/1brc/)|
+| ?.*|   00:03.902     | [link](https://github.com/dannyvankooten/1brc) | C    | [Danny van Kooten](https://github.com/dannyvankooten)|[blog](https://www.dannyvankooten.com/blog/2024/1brc/)|
 
-
-> \* *"under 2 seconds on my not-so-fast AMD Ryzen 4800U laptop CPU"* sounds cool, but the laptop [has 8C/16T with 4.2 GHz frequency](https://www.cpubenchmark.net/cpu.php?id=3721&cpu=AMD+Ryzen+7+4800U). Let's say it's throttled a little and is at 4 GHz effectively. My benchmark machine is 6 x 2.5 = 15 GHz, that CPU is 8 * 4 = 32 GHz equivalent per die, or 2x times faster.
-
-> For .NET AOT added this properties and `dotnet publish -r linux-x64 -c Release`
-> ```
-><PublishAot>true</PublishAot>
-><OptimizationPreference>Speed</OptimizationPreference>
-><IlcInstructionSet>native</IlcInstructionSet>
-><PublishReadyToRun>true</PublishReadyToRun>
-> ```
-> Interestingly AOT is beneficial for my code but detrimental for the other two versions.
+> \* *"under 2 seconds on my not-so-fast AMD Ryzen 4800U laptop CPU"* sounds cool, but the laptop [has 8C/16T with 4.2 GHz frequency](https://www.cpubenchmark.net/cpu.php?id=3721&cpu=AMD+Ryzen+7+4800U). Let's say it's throttled a little and is at 4 GHz effectively. My benchmark machine is 6 x 2.5 = 15 GHz, that CPU is 8 * 4 = 32 GHz equivalent per die, or 2x times faster. The math checks out.
 
 ## Evolution
 
