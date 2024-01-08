@@ -19,26 +19,6 @@ Note that his implementation supports `\r\n` line endings. The numbers in the Ev
 
 **As of Jan 7, 20:30 UTC**
 
-**.NET**
-
-| № | JIT           | AOT           | Implementation     | &nbsp;&nbsp;&nbsp;Runtime&nbsp;&nbsp;&nbsp; | Submitter     |
-|---|---------------|---------------|--------------------|---------|---------------|
-| 1.| 00:03.971     | 00:03.725     | **THIS REPO**| linux-x64| [Victor Baybekov](https://github.com/buybackoff)|
-| 2.| 00:04.524     | 00:04.668     | [link](https://github.com/praeclarum/1brc)| linux-x64| [Frank A. Krueger](https://github.com/praeclarum)|
-| 3.| 00:05.979     | 00:06.657     | [link](https://github.com/pedrosakuma/1brc)| linux-x64| [Pedro Travi](https://github.com/pedrosakuma)|
-| 4.| 00:08.079     | 00:08.589     | [link](https://github.com/hexawyz/OneBillionRows)| linux-x64| [Fabien Barbier](https://github.com/hexawyz)|
-
-**Java**
-
-| №  | JIT            | &nbsp;&nbsp;&nbsp;AOT&nbsp;&nbsp;&nbsp;       | Implementation     | Runtime | Submitter     |
-|----|----------------|-----------------|--------------------|-----|---------------|
-| 1. | **00:03.108**  | ✖️        | [link](https://github.com/gunnarmorling/1brc/blob/main/src/main/java/dev/morling/onebrc/CalculateAverage_royvanrijn.java)| 21.0.1-graal   | [Roy van Rijn](https://github.com/royvanrijn)|
-| 2. | ✖️             | 00:03.558 | [link](https://github.com/gunnarmorling/1brc/blob/main/src/main/java/dev/morling/onebrc/CalculateAverage_thomaswue.java)| 21.0.1-graal   | [Thomas Wuerthinger](https://github.com/thomaswue)| GraalVM native binary |
-| 3. | 00:04.128      | ✖️        | [link](https://github.com/gunnarmorling/1brc/blob/main/src/main/java/dev/morling/onebrc/CalculateAverage_merykitty.java)| 21.0.1-open   | [Quan Anh Mai](https://github.com/merykitty)|
-| ~  | 03:28.764      | ✖️        | [link](https://github.com/gunnarmorling/onebrc/blob/main/src/main/java/dev/morling/onebrc/CalculateAverage.java) (baseline)| 21.0.1-open   | [Gunnar Morling](https://github.com/gunnarmorling)|
-
-
-
 > For .NET AOT added this properties and `dotnet publish -r linux-x64 -c Release`
 > ```
 ><PublishAot>true</PublishAot>
@@ -48,6 +28,31 @@ Note that his implementation supports `\r\n` line endings. The numbers in the Ev
 > ```
 > Interestingly AOT is beneficial for my code but detrimental for the other two versions.
 
+**.NET**
+
+| № | JIT           | AOT           | Code     | &nbsp;&nbsp;&nbsp;Runtime&nbsp;&nbsp;&nbsp; | Submitter     |
+|---|---------------|---------------|--------------------|---------|---------------|
+| 1.| 00:03.971     | 00:03.725     | THIS REPO| linux-x64| [Victor Baybekov](https://github.com/buybackoff)|
+| 2.| 00:04.524     | 00:04.668     | [link](https://github.com/praeclarum/1brc)| linux-x64| [Frank A. Krueger](https://github.com/praeclarum)|
+| 3.| 00:05.979     | 00:06.657     | [link](https://github.com/pedrosakuma/1brc)| linux-x64| [Pedro Travi](https://github.com/pedrosakuma)|
+| 4.| 00:08.079     | 00:08.589     | [link](https://github.com/hexawyz/OneBillionRows)| linux-x64| [Fabien Barbier](https://github.com/hexawyz)|
+
+**Java**
+
+| №  | JIT            | &nbsp;&nbsp;&nbsp;AOT&nbsp;&nbsp;&nbsp;       | Code     | Runtime | Submitter     |
+|----|----------------|-----------------|--------------------|-----|---------------|
+| 1. | **00:03.108**  | ✖️        | [link](https://github.com/gunnarmorling/1brc/blob/main/src/main/java/dev/morling/onebrc/CalculateAverage_royvanrijn.java)| 21.0.1-graal   | [Roy van Rijn](https://github.com/royvanrijn)|
+| 2. | ✖️             | 00:03.558 | [link](https://github.com/gunnarmorling/1brc/blob/main/src/main/java/dev/morling/onebrc/CalculateAverage_thomaswue.java)| 21.0.1-graal   | [Thomas Wuerthinger](https://github.com/thomaswue)| GraalVM native binary |
+| 3. | 00:04.128      | ✖️        | [link](https://github.com/gunnarmorling/1brc/blob/main/src/main/java/dev/morling/onebrc/CalculateAverage_merykitty.java)| 21.0.1-open   | [Quan Anh Mai](https://github.com/merykitty)|
+| ~  | 03:28.764      | ✖️        | [link](https://github.com/gunnarmorling/onebrc/blob/main/src/main/java/dev/morling/onebrc/CalculateAverage.java) (base)| 21.0.1-open   | [Gunnar Morling](https://github.com/gunnarmorling)|
+
+**Native**
+
+| №  | &nbsp;&nbsp;&nbsp;AOT&nbsp;&nbsp;&nbsp;       | Implementation     | Language | Submitter     | Blog |
+|----|-----------------|--------------------|-----|---------------|--------------|
+| ?.* | **00:03.902**   | [link](https://github.com/dannyvankooten/1brc) | C (gcc 12.2.0)   | [Danny van Kooten](https://github.com/dannyvankooten)|[blog](https://www.dannyvankooten.com/blog/2024/1brc/)|
+
+> \* *"under 2 seconds on my not-so-fast AMD Ryzen 4800U laptop CPU"* sounds cool, but the laptop [has 8C/16T with 4.2 GHz frequency](https://www.cpubenchmark.net/cpu.php?id=3721&cpu=AMD+Ryzen+7+4800U). Let's say it's throttled a little and is at 4 GHz effectively. My benchmark machine is 6 x 2.5 = 15 GHz, that CPU is 8 * 4 = 32 GHz equivalent per core, or 2x times faster.
 
 ## Evolution
 
