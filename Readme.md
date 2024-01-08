@@ -12,15 +12,6 @@ This implementation supports `\r\n` line endings. The numbers in the Evolution s
 
 **As of Jan 7, 20:30 UTC**
 
-> For .NET AOT added this properties and `dotnet publish -r linux-x64 -c Release`
-> ```
-><PublishAot>true</PublishAot>
-><OptimizationPreference>Speed</OptimizationPreference>
-><IlcInstructionSet>native</IlcInstructionSet>
-><PublishReadyToRun>true</PublishReadyToRun>
-> ```
-> Interestingly AOT is beneficial for my code but detrimental for the other two versions.
-
 **.NET**
 
 | № | JIT           | AOT           | Code     | &nbsp;&nbsp;&nbsp;Runtime&nbsp;&nbsp;&nbsp; | Submitter     |
@@ -46,6 +37,15 @@ This implementation supports `\r\n` line endings. The numbers in the Evolution s
 | ?.* | **00:03.902**   | [link](https://github.com/dannyvankooten/1brc) | C (gcc 12.2.0)   | [Danny van Kooten](https://github.com/dannyvankooten)|[blog](https://www.dannyvankooten.com/blog/2024/1brc/)|
 
 > \* *"under 2 seconds on my not-so-fast AMD Ryzen 4800U laptop CPU"* sounds cool, but the laptop [has 8C/16T with 4.2 GHz frequency](https://www.cpubenchmark.net/cpu.php?id=3721&cpu=AMD+Ryzen+7+4800U). Let's say it's throttled a little and is at 4 GHz effectively. My benchmark machine is 6 x 2.5 = 15 GHz, that CPU is 8 * 4 = 32 GHz equivalent per die, or 2x times faster.
+
+> For .NET AOT added this properties and `dotnet publish -r linux-x64 -c Release`
+> ```
+><PublishAot>true</PublishAot>
+><OptimizationPreference>Speed</OptimizationPreference>
+><IlcInstructionSet>native</IlcInstructionSet>
+><PublishReadyToRun>true</PublishReadyToRun>
+> ```
+> Interestingly AOT is beneficial for my code but detrimental for the other two versions.
 
 ## Evolution
 
