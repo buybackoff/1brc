@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Diagnostics;
 using System.IO.MemoryMappedFiles;
 using System.Text;
@@ -42,7 +42,7 @@ namespace _1brc
             _fileLength = fileLength;
         }
 
-        public List<(long start, int length)> SplitIntoMemoryChunks()
+        public (long start, int length)[] SplitIntoMemoryChunks()
         {
             Debug.Assert(_fileStream.Position == 0);
 
@@ -58,7 +58,7 @@ namespace _1brc
                 chunkSize = _fileLength / chunkCount;
             }
 
-            List<(long start, int length)> chunks = new();
+            (long start, int length)[] chunks = new(long start, int length)[chunkCount];
 
             long pos = 0;
 
@@ -66,7 +66,7 @@ namespace _1brc
             {
                 if (pos + chunkSize >= _fileLength)
                 {
-                    chunks.Add((pos, (int)(_fileLength - pos)));
+                    chunks[i] = (pos, (int)(_fileLength - pos));
                     break;
                 }
 
@@ -81,26 +81,26 @@ namespace _1brc
 
                 newPos = _fileStream.Position;
                 var len = newPos - pos;
-                chunks.Add((pos, (int)(len)));
+                chunks[i] = (pos, (int)(len));
                 pos = newPos;
             }
 
             var previous = chunks[0];
-            for (int i = 1; i < chunks.Count; i++)
+            for (int i = 1; i < chunks.Length; i++)
             {
                 var current = chunks[i];
 
                 if (previous.start + previous.length != current.start)
                     throw new Exception("Bad chunks");
 
-                if (i == chunks.Count - 1 && current.start + current.length != _fileLength)
+                if (i == chunks.Length - 1 && current.start + current.length != _fileLength)
                     throw new Exception("Bad last chunks");
 
                 previous = current;
             }
 
             _fileStream.Position = 0;
-            
+
             return chunks;
         }
 
@@ -114,7 +114,7 @@ namespace _1brc
                 var separatorIdx = remaining.IndexOf(0, (byte)';');
                 var dotIdx = remaining.IndexOf(separatorIdx + 1, (byte)'.');
                 var nlIdx = remaining.IndexOf(dotIdx + 1, (byte)'\n');
-                        
+
                 GetValueRefOrAddDefault(result, new Utf8Span(remaining.Pointer, separatorIdx), out var exists)
                     .Apply(remaining.ParseInt(separatorIdx + 1, dotIdx - separatorIdx - 1), exists);
                 remaining = remaining.SliceUnsafe(nlIdx + 1);
@@ -123,14 +123,29 @@ namespace _1brc
             return result;
         }
 
-        public Dictionary<Utf8Span, Summary> Process() =>
-            SplitIntoMemoryChunks()
-                .AsParallel()
-#if DEBUG
-                .WithDegreeOfParallelism(1)
-#endif
-                .Select((tuple => ProcessChunk(tuple.start, tuple.length)))
-                .ToList()
+        public Dictionary<Utf8Span, Summary> Process()
+        {
+            var chunks = SplitIntoMemoryChunks();
+            Thread[] threads = new Thread[chunks.Length];
+            Dictionary<Utf8Span, Summary>[] results = new Dictionary<Utf8Span, Summary>[chunks.Length];
+
+            for (int i = 0; i < chunks.Length; i++)
+            {
+                var chunk = chunks[i];
+                threads[i] = new Thread((x) =>
+                {
+                    results[(int)x] = ProcessChunk(chunk.start, chunk.length);
+                });
+                threads[i].Start(i);
+            }
+
+            for (int i = 0; i < chunks.Length; i++)
+            {
+                threads[i].Join();
+            }
+
+
+            return results
                 .Aggregate((result, chunk) =>
                 {
                     foreach (KeyValuePair<Utf8Span, Summary> pair in chunk)
@@ -144,6 +159,7 @@ namespace _1brc
 
                     return result;
                 });
+        }
 
         public void PrintResult()
         {
