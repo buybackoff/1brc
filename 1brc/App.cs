@@ -138,13 +138,12 @@ namespace _1brc
         {
             while (remaining.Length > 0)
             {
-                var separatorIdx = remaining.IndexOf(0, (byte)';');
-                var dotIdx = remaining.IndexOf(separatorIdx + 1, (byte)'.');
-                var nlIdx = remaining.IndexOf(dotIdx + 1, (byte)'\n');
+                nuint idx = remaining.IndexOfSemicolon();
 
-                result.GetValueRefOrAddDefault(new Utf8Span(remaining.Pointer, separatorIdx))
-                    .Apply(remaining.ParseInt(separatorIdx + 1, dotIdx - separatorIdx - 1));
-                remaining = remaining.SliceUnsafe(nlIdx + 1);
+                result.GetValueRefOrAddDefault(new Utf8Span(remaining.Pointer, idx))
+                    .Apply(remaining.ParseInt(idx + 1, out idx));
+
+                remaining = remaining.SliceUnsafe(idx);
             }
         }
 

@@ -81,6 +81,7 @@ namespace _1brc
         
         public override bool Equals(object? obj) => obj is Utf8Span other && Equals(other);
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override int GetHashCode()
         {
             // Here we use the first 4 chars (if ASCII) and the length for a hash.
@@ -88,74 +89,83 @@ namespace _1brc
             // which for human geo names is quite rare. 
 
             // .NET dictionary will obviously slow down with collisions but will still work.
-            // If we keep only `*_pointer` the run time is still reasonable ~9 secs.
-            // Just using `if (_len > 0) return (_len * 820243) ^ (*_pointer);` gives 5.8 secs.
-            // By just returning 0 - the worst possible hash function and linear search - the run time is 12x slower at 56 seconds. 
+            
+            // Note that by construction we have `;` after the name, so hashing `abc;` or `a;` is fine.
+            // Utf8Span points to a large blob that always has values beyond the length 
+            
+            if (Length >= 3)
+                return (int)((Length * 820243u) ^ (uint)(*(uint*)(Pointer)));
 
-            // The magic number 820243 is the largest happy prime that contains 2024 from https://prime-numbers.info/list/happy-primes-page-9
-
-            // Avoid zero-extension when casting to int, go via uint first.
-
-            if (Length > 3)
-                return (int)(uint)((Length * 820243u) ^ *(uint*)Pointer);
-
-            if (Length > 1)
-                return (int)(uint)(*(ushort*)Pointer);
-
-            return (int)(uint)*Pointer;
+            return (int)(uint)(*(ushort*)Pointer * 31);
         }
 
         public override string ToString() => new((sbyte*)Pointer, 0, (int)Length, Encoding.UTF8);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int ParseInt(nuint start, nuint length)
+        public nint ParseInt(nuint start, out nuint lfIndex)
         {
-            int sign = 1;
-            uint value = 0;
-            var end = start + length;
-            
-            for (; start < end; start++)
-            {
-                var c = (uint)Pointer[start];
+            var ptr = Pointer + start;
+            nint sign;
 
-                if (c == '-')
-                    sign = -1;
-                else
-                    value = value * 10u + (c - '0');
+            if (*ptr == (byte)'-')
+            {
+                ptr++;
+                sign = -1;
+                lfIndex = start + 5;
+            }
+            else
+            {
+                sign = 1;
+                lfIndex = start + 4;
             }
 
-            var fractional = (uint)Pointer[start + 1] - '0';
-            return sign * (int)(value * 10 + fractional);
+            if (ptr[1] == '.')
+                return (nint)(ptr[0] * 10u + ptr[2] - ('0' * 11u)) * sign;
+
+            lfIndex++;
+            return (nint)(ptr[0] * 100u + ptr[1] * 10 + ptr[3] - '0' * 111u) * sign;
         }
-
+        
+        /// <summary>
+        /// Sprec: Station name: non null UTF-8 string of min length 1 character and max length 100 bytes (i.e. this could be 100 one-byte characters, or 50 two-byte characters, etc.)
+        /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal nuint IndexOf(nuint start, byte needle)
+        internal nuint IndexOfSemicolon()
         {
-            if (Avx2.IsSupported)
+            const nuint vectorSize = 32;
+            const nuint stride = 4;
+            nuint start = 0;
+            if (Vector256.IsHardwareAccelerated)
             {
-                var needleVec = new Vector<byte>(needle);
-                Vector<byte> vec;
-                while (true)
+                Debug.Assert(Length > vectorSize * stride);
+                
+                var sepVec = Vector256.Create((byte)';');
+                
+                for (int i = 0; i < 4; i++)
                 {
-                    if (start + (uint)Vector<byte>.Count >= Length)
-                        goto FALLBACK;
-                    var data = Unsafe.ReadUnaligned<Vector<byte>>(Pointer + start);
-                    vec = Vector.Equals(data, needleVec);
-                    if (!vec.Equals(Vector<byte>.Zero))
-                        break;
-                    start += (uint)Vector<byte>.Count;
-                }
+                    var matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(Pointer + start), sepVec);
+                    var mask = (uint)Avx2.MoveMask(matches);
+                    if (mask != 0)
+                    {
+                        var tzc = (uint)BitOperations.TrailingZeroCount(mask);
+                        return start + tzc;
+                    }
 
-                var matches = vec.AsVector256();
-                var mask = Avx2.MoveMask(matches);
-                var tzc = (uint)BitOperations.TrailingZeroCount((uint)mask);
-                return start + tzc;
+                    start += vectorSize;
+                }
             }
 
-            FALLBACK:
-
-            int indexOf = SliceUnsafe(start).Span.IndexOf(needle);
-            return indexOf < 0 ? Length : start + (uint)indexOf;
+            return IndexOf(start, (byte)';');
+        }
+        
+        /// <summary>
+        /// Generic fallback
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private nuint IndexOf(nuint start, byte needle)
+        {
+            var indexOf = (nuint)SliceUnsafe(start).Span.IndexOf(needle);
+            return (nint)indexOf < 0 ? Length : start + indexOf;
         }
     }
 }
