@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
 using System.Text;
@@ -35,13 +37,49 @@ namespace _1brc
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal Utf8Span SliceUnsafe(nuint start) => new(Pointer + start, Length - start);
         
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool Equals(Utf8Span other) => Span.SequenceEqual(other.Span);
-
-        public override bool Equals(object? obj)
+        // Static data, no allocations. It's inlined in an assembly and has a fixed address.
+        // ReSharper disable RedundantExplicitArraySize : it's very useful to ensure the right size.
+        private static ReadOnlySpan<byte> StrcmpMask256 => new byte[64]
         {
-            return obj is Utf8Span other && Equals(other);
+            255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        };
+        
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="other"></param>
+        /// <param name="isSimdSafe"> True if `Pointer + 31` and `other.Pointer + 31` locations are in the process memory and loading a Vector256 from the pointers is safe. </param>
+        /// <returns></returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool Equals(Utf8Span other) //, bool isSimdSafe)
+        {
+            // With good hashing the values are almost always equal, but we need to prove that.
+            // Span.SequenceEqual is the best general purpose API for comparing memory equality.
+            // But it's not inlined and quite heavy for short values.
+            
+            // This solution is extremely fast for up to 32 bytes.
+            // However, from inside the Utf8Span we cannot guarantee that dereferencing of a vector
+            // will not segfault. To avoid such a problem we ensure that it's safe to touch 64 bytes
+            // from every new line in a chunk.
+
+            if (Vector256.IsHardwareAccelerated && Length <= (uint)Vector256<byte>.Count)
+            {
+                if (Length != other.Length)
+                    return false;
+
+                var mask = Vector256.LoadUnsafe(in MemoryMarshal.GetReference(StrcmpMask256), (uint)Vector256<byte>.Count - Length);
+                var bytes = Vector256.Load(Pointer);
+                var otherBytes = Vector256.Load(other.Pointer);
+
+                // return Avx2.And(bytes, mask) == Avx2.And(otherBytes, mask);
+                return Avx.TestC(Avx2.And(bytes, mask), Avx2.And(otherBytes, mask));
+            }
+
+            return Span.SequenceEqual(other.Span);
         }
+        
+        public override bool Equals(object? obj) => obj is Utf8Span other && Equals(other);
 
         public override int GetHashCode()
         {
