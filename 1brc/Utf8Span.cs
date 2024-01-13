@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
@@ -10,36 +9,32 @@ namespace _1brc
     public readonly unsafe struct Utf8Span : IEquatable<Utf8Span>
     {
         internal readonly byte* Pointer;
-        internal readonly int Length;
+        internal readonly nuint Length;
 
-        public Utf8Span(byte* pointer, int length)
+        public Utf8Span(byte* pointer, nuint length)
         {
-            Debug.Assert(length >= 0);
             Pointer = pointer;
             Length = length;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal byte GetAtUnsafe(int idx) => Pointer[idx];
-
         public ReadOnlySpan<byte> Span
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => new(Pointer, Length);
+            get => new(Pointer, (int)(uint)Length);
         }
 
         /// <summary>
         /// Slice without bound checks. Use only when the bounds are checked/ensured before the call.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal Utf8Span SliceUnsafe(int start, int length) => new(Pointer + start, length);
+        internal Utf8Span SliceUnsafe(nuint start, nuint length) => new(Pointer + start, length);
 
         /// <summary>
         /// Slice without bound checks. Use only when the bounds are checked/ensured before the call.
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal Utf8Span SliceUnsafe(int start) => new(Pointer + start, Length - start);
-
+        internal Utf8Span SliceUnsafe(nuint start) => new(Pointer + start, Length - start);
+        
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Equals(Utf8Span other) => Span.SequenceEqual(other.Span);
 
@@ -64,7 +59,7 @@ namespace _1brc
             // Avoid zero-extension when casting to int, go via uint first.
 
             if (Length > 3)
-                return (Length * 820243) ^ (int)(*(uint*)Pointer);
+                return (int)(uint)((Length * 820243u) ^ *(uint*)Pointer);
 
             if (Length > 1)
                 return (int)(uint)(*(ushort*)Pointer);
@@ -72,10 +67,10 @@ namespace _1brc
             return (int)(uint)*Pointer;
         }
 
-        public override string ToString() => new((sbyte*)Pointer, 0, Length, Encoding.UTF8);
+        public override string ToString() => new((sbyte*)Pointer, 0, (int)Length, Encoding.UTF8);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int ParseInt(int start, int length)
+        public int ParseInt(nuint start, nuint length)
         {
             int sign = 1;
             uint value = 0;
@@ -83,7 +78,7 @@ namespace _1brc
             
             for (; start < end; start++)
             {
-                var c = (uint)GetAtUnsafe(start);
+                var c = (uint)Pointer[start];
 
                 if (c == '-')
                     sign = -1;
@@ -91,12 +86,12 @@ namespace _1brc
                     value = value * 10u + (c - '0');
             }
 
-            var fractional = (uint)GetAtUnsafe(start + 1) - '0';
+            var fractional = (uint)Pointer[start + 1] - '0';
             return sign * (int)(value * 10 + fractional);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal int IndexOf(int start, byte needle)
+        internal nuint IndexOf(nuint start, byte needle)
         {
             if (Avx2.IsSupported)
             {
@@ -104,25 +99,25 @@ namespace _1brc
                 Vector<byte> vec;
                 while (true)
                 {
-                    if (start + Vector<byte>.Count >= Length)
+                    if (start + (uint)Vector<byte>.Count >= Length)
                         goto FALLBACK;
                     var data = Unsafe.ReadUnaligned<Vector<byte>>(Pointer + start);
                     vec = Vector.Equals(data, needleVec);
                     if (!vec.Equals(Vector<byte>.Zero))
                         break;
-                    start += Vector<byte>.Count;
+                    start += (uint)Vector<byte>.Count;
                 }
 
                 var matches = vec.AsVector256();
                 var mask = Avx2.MoveMask(matches);
-                int tzc = BitOperations.TrailingZeroCount((uint)mask);
+                var tzc = (uint)BitOperations.TrailingZeroCount((uint)mask);
                 return start + tzc;
             }
 
             FALLBACK:
 
             int indexOf = SliceUnsafe(start).Span.IndexOf(needle);
-            return indexOf < 0 ? Length : start + indexOf;
+            return indexOf < 0 ? Length : start + (uint)indexOf;
         }
     }
 }

@@ -107,7 +107,7 @@ namespace _1brc
         public Dictionary<Utf8Span, Summary> ProcessChunk(long start, int length)
         {
             var result = new Dictionary<Utf8Span, Summary>(DICT_INIT_CAPACITY);
-            var remaining = new Utf8Span(_pointer + start, length);
+            var remaining = new Utf8Span(_pointer + start, (uint)length);
 
             while (remaining.Length > 0)
             {
@@ -115,8 +115,8 @@ namespace _1brc
                 var dotIdx = remaining.IndexOf(separatorIdx + 1, (byte)'.');
                 var nlIdx = remaining.IndexOf(dotIdx + 1, (byte)'\n');
                         
-                GetValueRefOrAddDefault(result, new Utf8Span(remaining.Pointer, separatorIdx), out var exists)
-                    .Apply(remaining.ParseInt(separatorIdx + 1, dotIdx - separatorIdx - 1), exists);
+                GetValueRefOrAddDefault(result, new Utf8Span(remaining.Pointer, separatorIdx), out _)
+                    .Apply(remaining.ParseInt(separatorIdx + 1, dotIdx - separatorIdx - 1));
                 remaining = remaining.SliceUnsafe(nlIdx + 1);
             }
 
@@ -149,7 +149,7 @@ namespace _1brc
         {
             var result = Process();
 
-            long count = 0;
+            ulong count = 0;
             Console.OutputEncoding = Encoding.UTF8;
             Console.Write("{");
             var line = 0;

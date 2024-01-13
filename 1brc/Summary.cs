@@ -1,69 +1,53 @@
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 
 namespace _1brc
 {
-    [StructLayout(LayoutKind.Sequential, Size = 16)]
-    public struct Summary
+    public struct Summary : ISpanFormattable
     {
-        public long Sum;
-        public int Count;
-        public short Min;
-        public short Max;
-        
+        public nint Sum;
+        public nuint Count;
+        public nint Min;
+        public nint Max;
+
         public double Average => (double)Sum / Count;
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Apply(int value, bool existing)
-        {
-            if (existing)
-                Apply(value);
-            else
-                Init(value);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Init(int value)
-        {
-            Sum = value;
-            Count = 1;
-            Min = (short)value;
-            Max = (short)value;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Apply(int value)
+        public void Apply(nint value)
         {
             Sum += value;
-            Count++;
-            Min = (short)GetMin(Min, value);
-            Max = (short)GetMax(Max, value);
-            
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            static int GetMin(int a, int b)
+            if (Count++ > 0)
             {
-                int delta = a - b;
-                return b + (delta & (delta >> 31));
+                // For normal real data (not an artificial sequence such as `0,-1,2,-3,4,-5,...`) the branches are not taken and we have less assignments. 
+                if (value < Min)
+                    Min = value;
+                if (value > Max)
+                    Max = value;
             }
-
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            static int GetMax(int a, int b)
+            else
             {
-                int delta = a - b;
-                return a - (delta & (delta >> 31));
+                Min = value;
+                Max = value;
             }
         }
 
         public void Merge(Summary other)
         {
-            if (other.Min < Min)
+            if (other.Min < Min || Count == 0)
                 Min = other.Min;
-            if (other.Max > Max)
+            if (other.Max > Max || Count == 0)
                 Max = other.Max;
             Sum += other.Sum;
             Count += other.Count;
         }
 
         public override string ToString() => $"{Min / 10.0:N1}/{Average / 10.0:N1}/{Max / 10.0:N1}";
+
+        // No change in performance for 1BRC, but this is the right approach to use ISpanFormattable
+        // https://github.com/buybackoff/1brc/issues/8
+
+        public bool TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
+            => destination.TryWrite($"{Min / 10.0:N1}/{Average / 10.0:N1}/{Max / 10.0:N1}", out charsWritten);
+
+        public string ToString(string? format, IFormatProvider? formatProvider) => ToString();
     }
 }

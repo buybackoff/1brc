@@ -11,6 +11,8 @@
         <OptimizationPreference>Speed</OptimizationPreference>
         <IlcInstructionSet>native</IlcInstructionSet>
         <PublishReadyToRun>true</PublishReadyToRun>
+        <TieredPGO>True</TieredPGO>
+        <ServerGarbageCollection>True</ServerGarbageCollection>
     </PropertyGroup>
 
 </Project>
