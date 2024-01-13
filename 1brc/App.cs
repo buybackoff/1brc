@@ -1,6 +1,7 @@
 ﻿using System.Buffers;
 using System.Diagnostics;
 using System.IO.MemoryMappedFiles;
+using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Win32.SafeHandles;
 using static System.Runtime.InteropServices.CollectionsMarshal;
@@ -100,50 +101,52 @@ namespace _1brc
             }
 
             _fileStream.Position = 0;
-            
+
             return chunks;
         }
 
-        public Dictionary<Utf8Span, Summary> ProcessChunk(long start, int length)
+        public FixedDictionary<Utf8Span, Summary> ProcessChunk(long start, uint length)
         {
-            var result = new Dictionary<Utf8Span, Summary>(DICT_INIT_CAPACITY);
-            var remaining = new Utf8Span(_pointer + start, (uint)length);
+            var result = new FixedDictionary<Utf8Span, Summary>();
+            ProcessChunk(result, new Utf8Span(_pointer + start, length));
+            return result;
+        }
 
+        public void ProcessChunk(FixedDictionary<Utf8Span, Summary> result, Utf8Span remaining)
+        {
             while (remaining.Length > 0)
             {
                 var separatorIdx = remaining.IndexOf(0, (byte)';');
                 var dotIdx = remaining.IndexOf(separatorIdx + 1, (byte)'.');
                 var nlIdx = remaining.IndexOf(dotIdx + 1, (byte)'\n');
-                        
-                GetValueRefOrAddDefault(result, new Utf8Span(remaining.Pointer, separatorIdx), out _)
+
+                result.GetValueRefOrAddDefault(new Utf8Span(remaining.Pointer, separatorIdx))
                     .Apply(remaining.ParseInt(separatorIdx + 1, dotIdx - separatorIdx - 1));
                 remaining = remaining.SliceUnsafe(nlIdx + 1);
             }
-
-            return result;
         }
 
-        public Dictionary<Utf8Span, Summary> Process() =>
-            SplitIntoMemoryChunks()
+        public FixedDictionary<Utf8Span, Summary> Process()
+        {
+            var result = SplitIntoMemoryChunks()
                 .AsParallel()
 #if DEBUG
                 .WithDegreeOfParallelism(1)
 #endif
-                .Select((tuple => ProcessChunk(tuple.start, tuple.length)))
+                .Select((tuple => ProcessChunk(tuple.start, (uint)tuple.length)))
                 .ToList()
                 .Aggregate((result, chunk) =>
                 {
                     foreach (KeyValuePair<Utf8Span, Summary> pair in chunk)
                     {
-                        ref var summary = ref GetValueRefOrAddDefault(result, pair.Key, out bool exists);
-                        if (exists)
-                            summary.Merge(pair.Value);
-                        else
-                            summary = pair.Value;
+                        result.GetValueRefOrAddDefault(pair.Key).Merge(pair.Value);
                     }
 
                     return result;
                 });
+
+            return result;
+        }
 
         public void PrintResult()
         {
