@@ -20,11 +20,11 @@ namespace _1brc
         private readonly nint _leftoverPtr;
 
         private const int MAX_CHUNK_SIZE = int.MaxValue - 100_000;
-        
+
         private const int MAX_VECTOR_SIZE = 32;
-        
+
         private const int MAX_LINE_SIZE = MAX_VECTOR_SIZE * 4; // 100  ; -  99.9 \n => 107 => 4x Vector size
-        
+
         private const int LEFTOVER_CHUNK_ALLOC = MAX_LINE_SIZE * 8;
 
         public string FilePath { get; }
@@ -57,7 +57,7 @@ namespace _1brc
 
             // All chunks must be safe to dereference the largest possible SIMD vector (e.g. 64 bytes even if AVX512 is not used)
             // For that we leave a very  small chunk at the end, copy it content and process it after the main job is done. 
-            
+
             var fileLength = _fileStream.Length;
 
             var chunkCount = _chunkCount;
@@ -183,28 +183,28 @@ namespace _1brc
             var sb = new StringBuilder();
 
             sb.Append("{");
-
-            var line = 0;
-
+            
             var ordered = result
                     .Select(x => (Name: x.Key.ToString(), x.Value))
                     .OrderBy(x => x.Name, StringComparer.Ordinal)
                 ;
 
+            var first = true;
             foreach (var pair in ordered)
             {
                 count += pair.Value.Count;
 
-                sb.Append($"{pair.Name} = {pair.Value}");
-
-                line++;
-                if (line < result.Count)
-                    sb.Append(", ");
+                if (!first) sb.Append(", ");
+                first = false;
+                
+                sb.Append($"{pair.Name}={pair.Value}");
             }
 
-            sb.AppendLine("}");
+            sb.Append("}");
 
-            Console.WriteLine(sb);
+            var strResult = sb.ToString();
+            // File.WriteAllText($"D:/tmp/results/buybackoff_{DateTime.Now:yy-MM-dd_hhmmss}.txt", strResult);
+            Console.WriteLine(strResult);
 
             if (count != 1_000_000_000)
                 Console.WriteLine($"Total row count {count:N0}");
