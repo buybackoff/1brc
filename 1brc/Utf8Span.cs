@@ -36,7 +36,7 @@ namespace _1brc
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal Utf8Span SliceUnsafe(nuint start) => new(Pointer + start, Length - start);
-        
+
         // Static data, no allocations. It's inlined in an assembly and has a fixed address.
         // ReSharper disable RedundantExplicitArraySize : it's very useful to ensure the right size.
         private static ReadOnlySpan<byte> StrcmpMask256 => new byte[64]
@@ -44,7 +44,7 @@ namespace _1brc
             255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         };
-        
+
         /// <summary>
         /// 
         /// </summary>
@@ -57,7 +57,7 @@ namespace _1brc
             // With good hashing the values are almost always equal, but we need to prove that.
             // Span.SequenceEqual is the best general purpose API for comparing memory equality.
             // But it's not inlined and quite heavy for short values.
-            
+
             // This solution is extremely fast for up to 32 bytes.
             // However, from inside the Utf8Span we cannot guarantee that dereferencing of a vector
             // will not segfault. To avoid such a problem we ensure that it's safe to touch 64 bytes
@@ -72,13 +72,12 @@ namespace _1brc
                 var bytes = Vector256.Load(Pointer);
                 var otherBytes = Vector256.Load(other.Pointer);
 
-                // return Avx2.And(bytes, mask) == Avx2.And(otherBytes, mask);
-                return Avx.TestC(Avx2.And(bytes, mask), Avx2.And(otherBytes, mask));
+                return Avx2.And(bytes, mask) == Avx2.And(otherBytes, mask);
             }
 
             return Span.SequenceEqual(other.Span);
         }
-        
+
         public override bool Equals(object? obj) => obj is Utf8Span other && Equals(other);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -89,10 +88,10 @@ namespace _1brc
             // which for human geo names is quite rare. 
 
             // .NET dictionary will obviously slow down with collisions but will still work.
-            
+
             // Note that by construction we have `;` after the name, so hashing `abc;` or `a;` is fine.
             // Utf8Span points to a large blob that always has values beyond the length 
-            
+
             if (Length >= 3)
                 return (int)((Length * 820243u) ^ (uint)(*(uint*)(Pointer)));
 
@@ -125,7 +124,7 @@ namespace _1brc
             lfIndex++;
             return (nint)(ptr[0] * 100u + ptr[1] * 10 + ptr[3] - '0' * 111u) * sign;
         }
-        
+
         /// <summary>
         /// Sprec: Station name: non null UTF-8 string of min length 1 character and max length 100 bytes (i.e. this could be 100 one-byte characters, or 50 two-byte characters, etc.)
         /// </summary>
@@ -138,9 +137,9 @@ namespace _1brc
             if (Vector256.IsHardwareAccelerated)
             {
                 Debug.Assert(Length > vectorSize * stride);
-                
+
                 var sepVec = Vector256.Create((byte)';');
-                
+
                 for (int i = 0; i < 4; i++)
                 {
                     var matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(Pointer + start), sepVec);
@@ -157,7 +156,7 @@ namespace _1brc
 
             return IndexOf(start, (byte)';');
         }
-        
+
         /// <summary>
         /// Generic fallback
         /// </summary>
