@@ -6,5 +6,4 @@ See my detailed blog post about my 1BRC journey here: https://hotforknowledge.co
 
 # Results
 
-![Results summary](https://github.com/HotForKnowledge/hotforknowledge.github.io/blob/master/2024/01/13/7-1brc-in-dotnet-even-faster-than-java-cpp/results_summary.png)
-
+<iframe src="https://raw.githubusercontent.com/HotForKnowledge/hotforknowledge.github.io/master/2024/01/13/7-1brc-in-dotnet-even-faster-than-java-cpp/results_summary.html" onload='javascript:(function(o){o.style.height=o.contentWindow.document.body.scrollHeight+"px";}(this));' style="height:200px;width:100%;border:none;overflow:hidden;"></iframe>
