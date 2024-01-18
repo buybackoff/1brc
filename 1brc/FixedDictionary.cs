@@ -14,7 +14,7 @@ namespace _1brc
     public unsafe class FixedDictionary<TKey, TValue> : IReadOnlyCollection<KeyValuePair<TKey, TValue>>
         where TKey : struct, IEquatable<TKey>
     {
-        private const int CAPACITY = 10_000;
+        private const int CAPACITY = 40_000;
         private static readonly int Size = HashHelpers.GetPrime(CAPACITY);
         private static readonly ulong FastModMultiplier = HashHelpers.GetFastModMultiplier((uint)Size);
 
