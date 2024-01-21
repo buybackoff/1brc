@@ -116,7 +116,15 @@ namespace _1brc
             entry.hashCode = hashCode;
             entry.next = (_buckets.GetAtUnsafe(fastMod) - 1); // Value in _buckets is 1-based
             entry.key = key;
-            entry.value = default!;
+
+            if (typeof(TValue) == typeof(Summary))
+            {
+                entry.value = (TValue)(object)new Summary() { Count = 0, Sum = 0, Max = -1000, Min = 1000 };
+            }
+            else
+            {
+                entry.value = default!;
+            }
 
             _buckets.GetAtUnsafe(fastMod) = index + 1; // Value in _buckets is 1-based
 

@@ -15,19 +15,13 @@ namespace _1brc
         public void Apply(nint value)
         {
             Sum += value;
-            if (Count++ > 0)
-            {
-                // For normal real data (not an artificial sequence such as `0,-1,2,-3,4,-5,...`) the branches are not taken and we have less assignments. 
-                if (value < Min)
-                    Min = value;
-                if (value > Max)
-                    Max = value;
-            }
-            else
-            {
+            Count++;
+            // For normal real data (not an artificial sequence such as `0,-1,2,-3,4,-5,...`) the branches are not taken and we have less assignments. 
+            if (value < Min)
                 Min = value;
+            if (value > Max)
                 Max = value;
-            }
+
         }
 
         public void Merge(Summary other)
