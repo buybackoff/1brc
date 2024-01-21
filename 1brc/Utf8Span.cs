@@ -39,18 +39,13 @@ namespace _1brc
 
         // Static data, no allocations. It's inlined in an assembly and has a fixed address.
         // ReSharper disable RedundantExplicitArraySize : it's very useful to ensure the right size.
-        private static ReadOnlySpan<byte> StrcmpMask256 => new byte[64]
+        internal static ReadOnlySpan<byte> OnesAfterLength => new byte[64]
         {
-            255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
         };
+        
 
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="other"></param>
-        /// <param name="isSimdSafe"> True if `Pointer + 31` and `other.Pointer + 31` locations are in the process memory and loading a Vector256 from the pointers is safe. </param>
-        /// <returns></returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Equals(Utf8Span other) //, bool isSimdSafe)
         {
@@ -68,11 +63,13 @@ namespace _1brc
                 if (Length != other.Length)
                     return false;
 
-                var mask = Vector256.LoadUnsafe(in MemoryMarshal.GetReference(StrcmpMask256), (uint)Vector256<byte>.Count - Length);
+                var mask = Vector256.LoadUnsafe(in MemoryMarshal.GetReference(OnesAfterLength), (uint)Vector256<byte>.Count - Length);
                 var bytes = Vector256.Load(Pointer);
                 var otherBytes = Vector256.Load(other.Pointer);
-
-                return Avx2.And(bytes, mask) == Avx2.And(otherBytes, mask);
+                var bytesAnd = Vector256.Equals(bytes, otherBytes) | mask;
+                var msbMask = Vector256.ExtractMostSignificantBits(bytesAnd);
+                var equals = msbMask == uint.MaxValue;
+                return equals;
             }
 
             return Span.SequenceEqual(other.Span);
