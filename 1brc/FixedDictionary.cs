@@ -11,7 +11,7 @@ using static System.Runtime.CompilerServices.Unsafe;
 namespace _1brc
 {
     [DebuggerDisplay("Count = {" + nameof(Count) + "}")]
-    public unsafe class FixedDictionary<TKey, TValue> : IReadOnlyCollection<KeyValuePair<TKey, TValue>>
+    public unsafe class FixedDictionary<TKey, TValue> : IReadOnlyCollection<KeyValuePair<TKey, TValue>>, IDisposable
         where TKey : struct, IEquatable<TKey>
     {
         private const int CAPACITY = 40_000;
@@ -24,6 +24,8 @@ namespace _1brc
         // 1-based index into _entries; 0 means empty
         private readonly int[] _buckets = new int[Size];
         private readonly Entry[] _entries = new Entry[Size];
+        private readonly byte* _keys = (byte*)Marshal.AllocHGlobal(Size * 101);
+        private int _keysLength;
 
         [StructLayout(LayoutKind.Auto)]
         private struct Entry
@@ -100,6 +102,25 @@ namespace _1brc
         {
 
             int index = _count++;
+
+            if (typeof(TKey) == typeof(Utf8Span))
+            {
+                // Within the type check, this is no-op for JIT, no boxing happens. 
+                key = (TKey)(object)Copykey((Utf8Span)(object)key);
+
+                [MethodImpl(MethodImplOptions.AggressiveInlining)]
+                Utf8Span Copykey(Utf8Span utf8Span)
+                {
+                    var targetPtr = _keys + _keysLength;
+                    // For short keys (of length 1 and 3) we touch ; as a part of hash, e.g. read 1 byte beyond Utf8Span. Need to copy ; as well here.
+                    int utf8SpanLength = (int)utf8Span.Length + 1; 
+                    var target = new Span<byte>(targetPtr, utf8SpanLength);
+                    var source = new Span<byte>(utf8Span.Pointer, utf8SpanLength);
+                    source.CopyTo(target);
+                    _keysLength += utf8SpanLength;
+                    return new Utf8Span(targetPtr, utf8Span.Length);
+                }
+            }
 
             // No need for 1BRC
             // int index;
@@ -267,6 +288,22 @@ namespace _1brc
                 return highbits;
             }
         }
+
+        private void ReleaseUnmanagedResources()
+        {
+            Marshal.FreeHGlobal((nint)_keys);
+        }
+
+        public void Dispose()
+        {
+            ReleaseUnmanagedResources();
+            GC.SuppressFinalize(this);
+        }
+
+        ~FixedDictionary()
+        {
+            ReleaseUnmanagedResources();
+        }
     }
 
     public static class VectorExtensions
@@ -284,7 +321,7 @@ namespace _1brc
             Debug.Assert((uint)index < array.Length, "GetAtUnsafe: (uint)index < array.Length");
             return ref Add(ref AddByteOffset(ref As<Box<T>>(array)!.Value, arrayOffset), index);
         }
-        
+
         public class Box<T>
         {
             public T Value = default!;
