@@ -16,6 +16,7 @@ namespace _1brc
     {
         private const int CAPACITY = 40_000;
         private static readonly int Size = HashHelpers.GetPrime(CAPACITY);
+        private static readonly uint SizeU = (uint)Size;
         private static readonly ulong FastModMultiplier = HashHelpers.GetFastModMultiplier((uint)Size);
 
         private int _count;
@@ -56,6 +57,13 @@ namespace _1brc
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static uint FastMod(uint value)
+        {
+            uint highbits = (uint)(((((FastModMultiplier * value) >> 32) + 1) * SizeU) >> 32);
+            return highbits;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref TValue GetValueRefOrAddDefault(TKey key)
         {
             Entry[] entries = _entries;
@@ -64,7 +72,7 @@ namespace _1brc
 
             // 1BRC context: using GetAtUnsafe to avoid bound checks here is actually visible ~25-30 msecs.
 
-            uint fastMod = HashHelpers.FastMod(hashCode, (uint)Size, FastModMultiplier);
+            uint fastMod = FastMod(hashCode);
             int bucket = _buckets.GetAtUnsafe(fastMod);
 
             int i = bucket - 1; // Value in _buckets is 1-based
@@ -84,6 +92,13 @@ namespace _1brc
                 i = entries[i].next;
             }
 
+            return ref Add(key, hashCode, fastMod);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private ref TValue Add(TKey key, uint hashCode, uint fastMod)
+        {
+
             int index = _count++;
 
             // No need for 1BRC
@@ -96,10 +111,10 @@ namespace _1brc
             //     static void Throw() => throw new InvalidOperationException("Exceeded FixedDictionary capacity.");
             // }
 
-            ref Entry entry = ref entries.GetAtUnsafe((uint)index);
+            ref Entry entry = ref _entries.GetAtUnsafe((uint)index);
 
             entry.hashCode = hashCode;
-            entry.next = (bucket - 1); // Value in _buckets is 1-based
+            entry.next = (_buckets.GetAtUnsafe(fastMod) - 1); // Value in _buckets is 1-based
             entry.key = key;
             entry.value = default!;
 

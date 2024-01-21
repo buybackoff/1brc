@@ -125,35 +125,57 @@ namespace _1brc
         }
 
         /// <summary>
-        /// Sprec: Station name: non null UTF-8 string of min length 1 character and max length 100 bytes (i.e. this could be 100 one-byte characters, or 50 two-byte characters, etc.)
+        /// Spec: Station name: non null UTF-8 string of min length 1 character and max length 100 bytes (i.e. this could be 100 one-byte characters, or 50 two-byte characters, etc.)
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal nuint IndexOfSemicolon()
         {
             const nuint vectorSize = 32;
-            const nuint stride = 4;
-            nuint start = 0;
+            // nuint start = 0; // it's consistently faster with this useless variable (non constant)
+
             if (Vector256.IsHardwareAccelerated)
             {
-                Debug.Assert(Length > vectorSize * stride);
-
                 var sepVec = Vector256.Create((byte)';');
 
-                for (int i = 0; i < 4; i++)
-                {
-                    var matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(Pointer + start), sepVec);
-                    var mask = (uint)Avx2.MoveMask(matches);
-                    if (mask != 0)
-                    {
-                        var tzc = (uint)BitOperations.TrailingZeroCount(mask);
-                        return start + tzc;
-                    }
+                var matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(Pointer), sepVec);
+                var mask = (uint)Avx2.MoveMask(matches);
+                var tzc = (uint)BitOperations.TrailingZeroCount(mask);
 
-                    start += vectorSize;
+                if (mask == 0) // For non-taken branches prefer placing them in a "leaf" instead of mask != 0, somewhere on GH they explain why, it would be nice to find. 
+                    return IndexOfSemicolonCont(this);
+
+                return tzc;
+
+                [MethodImpl(MethodImplOptions.NoInlining)]
+                static nuint IndexOfSemicolonCont(Utf8Span span)
+                {
+                    // A nicer version would be just a recursive call, even not here but above instead of this function.
+                    // It's as fast for the default case and very close for 10K. Yet, this manually unrolled continuation is faster for 10K.   
+                    // return vectorSize + span.SliceUnsafe(vectorSize).IndexOfSemicolon();
+                    
+                    var sepVec = Vector256.Create((byte)';');
+                    var matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(span.Pointer + vectorSize), sepVec);
+                    var mask = (uint)Avx2.MoveMask(matches);
+                    var tzc = (uint)BitOperations.TrailingZeroCount(mask);
+                    if (mask != 0)
+                        return vectorSize + tzc;
+
+                    const nuint vectorSize2 = 2 * vectorSize;
+                    matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(span.Pointer + vectorSize2), sepVec);
+                    mask = (uint)Avx2.MoveMask(matches);
+                    tzc = (uint)BitOperations.TrailingZeroCount(mask);
+                    if (mask != 0)
+                        return vectorSize2 + tzc;
+
+                    const nuint vectorSize3 = 3 * vectorSize;
+                    matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(span.Pointer + vectorSize3), sepVec);
+                    mask = (uint)Avx2.MoveMask(matches);
+                    tzc = (uint)BitOperations.TrailingZeroCount(mask);
+                    return vectorSize3 + tzc;
                 }
             }
 
-            return IndexOf(start, (byte)';');
+            return IndexOf(0, (byte)';');
         }
 
         /// <summary>
