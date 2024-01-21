@@ -10,7 +10,7 @@
         <PublishAot>true</PublishAot>
         <OptimizationPreference>Speed</OptimizationPreference>
         <IlcInstructionSet>native</IlcInstructionSet>
-        <PublishReadyToRun>true</PublishReadyToRun>
+        <!-- <PublishReadyToRun>true</PublishReadyToRun> -->
         <TieredPGO>True</TieredPGO>
         <ServerGarbageCollection>True</ServerGarbageCollection>
     </PropertyGroup>
