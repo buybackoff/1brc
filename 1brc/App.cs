@@ -13,6 +13,8 @@ namespace _1brc
         MmapSingle = 1,
         MmapViewPerChunk = 2,
         MmapViewPerChunkRandom = 3,
+        RandomAccess = 4,
+        RandomAccessAsync = 5
     }
 
     public class App : IDisposable
@@ -45,6 +47,9 @@ namespace _1brc
 
         public unsafe App(string filePath, int? chunkCount = null, ProcessMode processMode = ProcessMode.Default)
         {
+            if (processMode == default)
+                processMode = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? ProcessMode.RandomAccessAsync : ProcessMode.MmapViewPerChunkRandom;
+            
             _processMode = processMode;
 
             _chunkCount = Math.Max(1, chunkCount ?? Environment.ProcessorCount);
@@ -99,7 +104,7 @@ namespace _1brc
             long pos = 0;
             _leftoverStart = 0;
             _leftoverLength = 0;
-
+            
             for (int i = 0; i < chunkCount; i++)
             {
                 int c;
@@ -171,6 +176,12 @@ namespace _1brc
                 case ProcessMode.MmapViewPerChunkRandom:
                     ProcessChunkMmapViewPerChunkRandom(threadResult, start, length, id);
                     break;
+                case ProcessMode.RandomAccess:
+                    ProcessChunkRandomAccess(threadResult, start, length);
+                    break;
+                case ProcessMode.RandomAccessAsync:
+                    ProcessChunkRandomAccessAsync(threadResult, start, length);
+                    break;
                 default:
                     throw new ArgumentOutOfRangeException();
             }
@@ -206,7 +217,7 @@ namespace _1brc
             var length0 = length / 2 + delta;
             using (var accessor = _mmf.CreateViewAccessor(start, length0 + 1024, MemoryMappedFileAccess.Read))
             {
-                
+
                 byte* ptr = default;
                 accessor.SafeMemoryMappedViewHandle.AcquirePointer(ref ptr);
                 ptr += accessor.PointerOffset;
@@ -228,6 +239,85 @@ namespace _1brc
                 ProcessSpan(resultAcc, new Utf8Span(ptr, (uint)length0));
                 accessor.SafeMemoryMappedViewHandle.ReleasePointer();
             }
+        }
+
+        public unsafe void ProcessChunkRandomAccess(FixedDictionary<Utf8Span, Summary> resultAcc, long start, uint length)
+        {
+            using var fileHandle = File.OpenHandle(FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, FileOptions.SequentialScan);
+
+            const int SEGMENT_SIZE = 512 * 1024;
+
+            // Refill the buffer when remaining is below than this
+            // const uint MIN_REMAINING_SIZE = 1024;
+
+            byte[] buffer = new byte[SEGMENT_SIZE + MAX_LINE_SIZE];
+
+            var chunkRemaining = (int)length;
+            fixed (byte* segmentPtr = &buffer[0])
+            {
+                while (chunkRemaining > 0)
+                {
+                    int bufferLength = Math.Min(SEGMENT_SIZE, chunkRemaining);
+                    var bufferSpan = buffer.AsSpan(0, bufferLength);
+
+                    // Just ignore what we've read after \n
+                    var segmentRead = RandomAccess.Read(fileHandle, bufferSpan, start);
+                    var segmentConsumed = bufferSpan.Slice(0, segmentRead).LastIndexOf((byte)'\n') + 1;
+
+                    chunkRemaining -= segmentConsumed;
+                    start += segmentConsumed;
+
+                    var remaining = new Utf8Span(segmentPtr, (uint)(segmentConsumed));
+
+                    ProcessSpan(resultAcc, remaining);
+                }
+            }
+        }
+
+        public void ProcessChunkRandomAccessAsync(FixedDictionary<Utf8Span, Summary> resultAcc, long start, uint length)
+        {
+            using var fileHandle = File.OpenHandle(FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, FileOptions.Asynchronous);
+            const int SEGMENT_SIZE = 512 * 1024;
+
+            // Refill the buffer when remaining is below than this
+            // const uint MIN_REMAINING_SIZE = 1024;
+
+            byte[] buffer0 = GC.AllocateArray<byte>(SEGMENT_SIZE + MAX_LINE_SIZE, pinned: true);
+            byte[] buffer1 = GC.AllocateArray<byte>(SEGMENT_SIZE + MAX_LINE_SIZE, pinned: true);
+
+            Task.Run(async () =>
+            {
+                var chunkRemaining = (int)length;
+
+                ValueTask<int> segmentReadTask = ValueTask.FromResult(0);
+
+                var awaitedZero = true;
+
+                while (chunkRemaining > 0)
+                {
+                    var bufferReadLen = await segmentReadTask;
+
+                    Memory<byte> memoryRead = (awaitedZero ? buffer0 : buffer1).AsMemory(0, bufferReadLen);
+
+                    var segmentConsumed = memoryRead.Span.Slice(0, bufferReadLen).LastIndexOf((byte)'\n') + 1;
+                    chunkRemaining -= segmentConsumed;
+                    start += segmentConsumed;
+
+                    int bufferLengthToRead = Math.Min(SEGMENT_SIZE, chunkRemaining);
+
+                    awaitedZero = !awaitedZero;
+                    var memoryToRead = (awaitedZero ? buffer0 : buffer1).AsMemory(0, bufferLengthToRead);
+
+                    segmentReadTask = RandomAccess.ReadAsync(fileHandle, memoryToRead, start);
+
+                    if (segmentConsumed > 0)
+                    {
+                        var remaining = new Utf8Span(ref memoryRead.Span[0], (uint)(segmentConsumed));
+                        ProcessSpan(resultAcc, remaining);
+
+                    }
+                }
+            }).Wait();
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
@@ -280,8 +370,6 @@ namespace _1brc
                     .Select(x => (Name: x.Key.ToString(), x.Value))
                     .OrderBy(x => x.Name, StringComparer.Ordinal)
                 ;
-            
-            
 
             var first = true;
             foreach (var pair in ordered)
@@ -301,7 +389,7 @@ namespace _1brc
             Console.WriteLine(strResult);
 
             result.Dispose();
-            
+
             if (count != 1_000_000_000)
                 Console.WriteLine($"Total row count {count:N0}");
         }
