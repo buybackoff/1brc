@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -16,6 +15,15 @@ namespace _1brc
         public Utf8Span(byte* pointer, nuint length)
         {
             Pointer = pointer;
+            Length = length;
+        }
+
+        /// <summary>
+        /// Ref MUST be to a pinned or native memory
+        /// </summary>
+        public Utf8Span(ref byte pointer, nuint length)
+        {
+            Pointer = (byte*)Unsafe.AsPointer(ref pointer);
             Length = length;
         }
 
@@ -102,26 +110,28 @@ namespace _1brc
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public nint ParseInt(nuint start, out nuint lfIndex)
         {
-            var ptr = Pointer + start;
-            nint sign;
+            var ptr = Pointer + start + 1;
+            int sign;
 
             if (*ptr == (byte)'-')
             {
                 ptr++;
                 sign = -1;
-                lfIndex = start + 5;
+                lfIndex = start + 6;
             }
             else
             {
                 sign = 1;
-                lfIndex = start + 4;
+                lfIndex = start + 5;
             }
 
-            if (ptr[1] == '.')
-                return (nint)(ptr[0] * 10u + ptr[2] - ('0' * 11u)) * sign;
+            if (ptr[1] != '.')
+            {
+                lfIndex++;
+                return (nint)(ptr[0] * 100u + ptr[1] * 10u + ptr[3] - '0' * 111u) * sign;
+            }
 
-            lfIndex++;
-            return (nint)(ptr[0] * 100u + ptr[1] * 10 + ptr[3] - '0' * 111u) * sign;
+            return (nint)(ptr[0] * 10u + ptr[2] - ('0' * 11u)) * sign;
         }
 
         /// <summary>

@@ -140,8 +140,7 @@ namespace _1brc
             {
                 nuint idx = remaining.IndexOfSemicolon();
 
-                result.GetValueRefOrAddDefault(new Utf8Span(remaining.Pointer, idx))
-                    .Apply(remaining.ParseInt(idx + 1, out idx));
+                result.GetValueRefOrAddDefault(new Utf8Span(remaining.Pointer, idx)).Apply(remaining.ParseInt(idx, out idx));
 
                 remaining = remaining.SliceUnsafe(idx);
             }
