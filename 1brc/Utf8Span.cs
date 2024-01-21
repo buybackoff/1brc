@@ -89,10 +89,12 @@ namespace _1brc
             // Note that by construction we have `;` after the name, so hashing `abc;` or `a;` is fine.
             // Utf8Span points to a large blob that always has values beyond the length 
 
-            if (Length >= 3)
-                return (int)((Length * 820243u) ^ (uint)(*(uint*)(Pointer)));
+            const uint prime = 16777619u;
 
-            return (int)(uint)(*(ushort*)Pointer * 31);
+            if (Length >= 3)
+                return (int)(((uint)Length * prime) ^ (*(uint*)(Pointer)));
+
+            return (int)(uint)(*(ushort*)Pointer * prime);
         }
 
         public override string ToString() => new((sbyte*)Pointer, 0, (int)Length, Encoding.UTF8);
