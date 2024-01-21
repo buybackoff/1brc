@@ -8,7 +8,7 @@ internal class Program
     {
         var sw = Stopwatch.StartNew();
         var path = args.Length > 0 ? args[0] : "D:/tmp/1brc_1B.txt";
-        using (var app = new App(path))
+        using (var app = new App(path, processMode:ProcessMode.MmapViewPerChunkRandom))
         {
             app.PrintResult();  
         }

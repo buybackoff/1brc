@@ -1,23 +1,37 @@
 ﻿using System.Diagnostics;
 using System.IO.MemoryMappedFiles;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Win32.SafeHandles;
 
 namespace _1brc
 {
-    public unsafe class App : IDisposable
+    public enum ProcessMode
     {
+        Default = 0,
+        MmapSingle = 1,
+        MmapViewPerChunk = 2,
+        MmapViewPerChunkRandom = 3,
+    }
+
+    public class App : IDisposable
+    {
+        private readonly ProcessMode _processMode;
         private readonly FileStream _fileStream;
         private readonly MemoryMappedFile _mmf;
-        private readonly MemoryMappedViewAccessor _va;
-        private readonly SafeMemoryMappedViewHandle _vaHandle;
-        private readonly byte* _pointer;
+        private readonly MemoryMappedViewAccessor? _va;
+        private readonly SafeMemoryMappedViewHandle? _vaHandle;
+        private readonly nint _pointer;
 
         private int _chunkCount;
         private long _leftoverStart;
-        private long _leftoverLength;
+        private int _leftoverLength;
         private readonly nint _leftoverPtr;
+
+        private int _threadsFinished;
+        private readonly SafeFileHandle _fileHandle;
+        private readonly List<(long start, int length)> _chunks;
 
         private const int MAX_CHUNK_SIZE = int.MaxValue - 100_000;
 
@@ -29,22 +43,34 @@ namespace _1brc
 
         public string FilePath { get; }
 
-        public App(string filePath, int? chunkCount = null)
+        public unsafe App(string filePath, int? chunkCount = null, ProcessMode processMode = ProcessMode.Default)
         {
+            _processMode = processMode;
+
             _chunkCount = Math.Max(1, chunkCount ?? Environment.ProcessorCount);
+#if DEBUG
+            _chunkCount = 1;
+#endif
+
             FilePath = filePath;
 
             _fileStream = new FileStream(FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 1, FileOptions.SequentialScan);
+            _fileHandle = _fileStream.SafeFileHandle;
             var fileLength = _fileStream.Length;
             _mmf = MemoryMappedFile.CreateFromFile(FilePath, FileMode.Open);
 
-            byte* ptr = (byte*)0;
-            _va = _mmf.CreateViewAccessor(0, fileLength, MemoryMappedFileAccess.Read);
-            _vaHandle = _va.SafeMemoryMappedViewHandle;
-            _vaHandle.AcquirePointer(ref ptr);
-            _pointer = ptr;
-
             _leftoverPtr = Marshal.AllocHGlobal(LEFTOVER_CHUNK_ALLOC);
+
+            if (_processMode == ProcessMode.MmapSingle)
+            {
+                byte* ptr = (byte*)0;
+                _va = _mmf.CreateViewAccessor(0, fileLength, MemoryMappedFileAccess.Read);
+                _vaHandle = _va.SafeMemoryMappedViewHandle;
+                _vaHandle.AcquirePointer(ref ptr);
+                _pointer = (nint)ptr;
+            }
+
+            _chunks = SplitIntoMemoryChunks();
         }
 
         public List<(long start, int length)> SplitIntoMemoryChunks()
@@ -85,7 +111,7 @@ namespace _1brc
                     while ((c = _fileStream.ReadByte()) >= 0 && c != '\n')
                     {
                         _leftoverStart = _fileStream.Position + 1;
-                        _leftoverLength = fileLength - _leftoverStart;
+                        _leftoverLength = (int)(fileLength - _leftoverStart);
                     }
 
                     chunks.Add((pos, (int)(fileLength - pos - _leftoverLength)));
@@ -127,14 +153,85 @@ namespace _1brc
             return chunks;
         }
 
-        public FixedDictionary<Utf8Span, Summary> ProcessChunk(long start, uint length)
+        /// <summary>
+        /// PLINQ Entry point
+        /// </summary>
+        public unsafe FixedDictionary<Utf8Span, Summary> ThreadProcessChunk(int id, long start, uint length)
         {
-            var result = new FixedDictionary<Utf8Span, Summary>();
-            ProcessChunk(result, new Utf8Span(_pointer + start, length));
-            return result;
+            var threadResult = new FixedDictionary<Utf8Span, Summary>();
+
+            switch (_processMode)
+            {
+                case ProcessMode.MmapSingle:
+                    ProcessChunkMmapSingle(threadResult, start, length);
+                    break;
+                case ProcessMode.MmapViewPerChunk:
+                    ProcessChunkMmapViewPerChunk(threadResult, start, length);
+                    break;
+                case ProcessMode.MmapViewPerChunkRandom:
+                    ProcessChunkMmapViewPerChunkRandom(threadResult, start, length, id);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+
+            if (Interlocked.Increment(ref _threadsFinished) == 1) // first thread finished
+            {
+                RandomAccess.Read(_fileHandle, new Span<byte>((byte*)_leftoverPtr, _leftoverLength), _leftoverStart);
+                var leftOverSafe = new Utf8Span((byte*)_leftoverPtr, (uint)_leftoverLength);
+                ProcessSpan(threadResult, leftOverSafe);
+            }
+
+            return threadResult;
         }
 
-        public void ProcessChunk(FixedDictionary<Utf8Span, Summary> result, Utf8Span remaining)
+        public unsafe void ProcessChunkMmapSingle(FixedDictionary<Utf8Span, Summary> resultAcc, long start, uint length)
+        {
+            ProcessSpan(resultAcc, new Utf8Span((byte*)_pointer + start, length));
+        }
+
+        public unsafe void ProcessChunkMmapViewPerChunk(FixedDictionary<Utf8Span, Summary> resultAcc, long start, uint length)
+        {
+            using var accessor = _mmf.CreateViewAccessor(start, length + _leftoverLength, MemoryMappedFileAccess.Read);
+            byte* ptr = default;
+            accessor.SafeMemoryMappedViewHandle.AcquirePointer(ref ptr);
+            ProcessSpan(resultAcc, new Utf8Span(ptr + accessor.PointerOffset, length));
+            accessor.SafeMemoryMappedViewHandle.ReleasePointer();
+        }
+
+        public unsafe void ProcessChunkMmapViewPerChunkRandom(FixedDictionary<Utf8Span, Summary> resultAcc, long start, uint length, int id)
+        {
+            var ratio = (double)(id + 1) / _chunks.Count;
+            var delta = (long)(0.45 * length * ratio);
+            var length0 = length / 2 + delta;
+            using (var accessor = _mmf.CreateViewAccessor(start, length0 + 1024, MemoryMappedFileAccess.Read))
+            {
+                
+                byte* ptr = default;
+                accessor.SafeMemoryMappedViewHandle.AcquirePointer(ref ptr);
+                ptr += accessor.PointerOffset;
+
+                var span = new Span<byte>(ptr, (int)length0 - 1024);
+                length0 = span.LastIndexOf((byte)'\n') + 1;
+                ProcessSpan(resultAcc, new Utf8Span(ptr, (uint)length0));
+                accessor.SafeMemoryMappedViewHandle.ReleasePointer();
+            }
+
+            using (var accessor = _mmf.CreateViewAccessor(start + length0, (length - length0) + _leftoverLength, MemoryMappedFileAccess.Read))
+            {
+                // var spanResult = new FixedDictionary<Utf8Span, Summary>();
+                length0 = (length - length0);
+                byte* ptr = default;
+                accessor.SafeMemoryMappedViewHandle.AcquirePointer(ref ptr);
+                ptr += accessor.PointerOffset;
+
+                ProcessSpan(resultAcc, new Utf8Span(ptr, (uint)length0));
+                accessor.SafeMemoryMappedViewHandle.ReleasePointer();
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static unsafe void ProcessSpan(FixedDictionary<Utf8Span, Summary> result, Utf8Span remaining)
         {
             while (remaining.Length > 0)
             {
@@ -148,12 +245,12 @@ namespace _1brc
 
         public FixedDictionary<Utf8Span, Summary> Process()
         {
-            var result = SplitIntoMemoryChunks()
+            var result = _chunks
                 .AsParallel()
 #if DEBUG
                 .WithDegreeOfParallelism(1)
 #endif
-                .Select((tuple => ProcessChunk(tuple.start, (uint)tuple.length)))
+                .Select((tuple, id) => ThreadProcessChunk(id, tuple.start, (uint)tuple.length))
                 .Aggregate((result, chunk) =>
                 {
                     foreach (KeyValuePair<Utf8Span, Summary> pair in chunk)
@@ -161,13 +258,9 @@ namespace _1brc
                         result.GetValueRefOrAddDefault(pair.Key).Merge(pair.Value);
                     }
 
+                    chunk.Dispose();
                     return result;
                 });
-
-            var leftOver = new Utf8Span(_pointer + _leftoverStart, (uint)_leftoverLength);
-            var leftOverSafe = new Utf8Span((byte*)_leftoverPtr, (uint)_leftoverLength);
-            leftOver.Span.CopyTo(new Span<byte>(leftOverSafe.Pointer, (int)leftOverSafe.Length));
-            ProcessChunk(result, leftOverSafe);
 
             return result;
         }
@@ -182,11 +275,13 @@ namespace _1brc
             var sb = new StringBuilder();
 
             sb.Append("{");
-            
+
             var ordered = result
                     .Select(x => (Name: x.Key.ToString(), x.Value))
                     .OrderBy(x => x.Name, StringComparer.Ordinal)
                 ;
+            
+            
 
             var first = true;
             foreach (var pair in ordered)
@@ -195,7 +290,7 @@ namespace _1brc
 
                 if (!first) sb.Append(", ");
                 first = false;
-                
+
                 sb.Append($"{pair.Name}={pair.Value}");
             }
 
@@ -205,6 +300,8 @@ namespace _1brc
             // File.WriteAllText($"D:/tmp/results/buybackoff_{DateTime.Now:yy-MM-dd_hhmmss}.txt", strResult);
             Console.WriteLine(strResult);
 
+            result.Dispose();
+            
             if (count != 1_000_000_000)
                 Console.WriteLine($"Total row count {count:N0}");
         }
@@ -212,10 +309,11 @@ namespace _1brc
         public void Dispose()
         {
             Marshal.FreeHGlobal(_leftoverPtr);
-            _vaHandle.ReleasePointer();
-            _vaHandle.Dispose();
-            _va.Dispose();
+            _vaHandle?.ReleasePointer();
+            _vaHandle?.Dispose();
+            _va?.Dispose();
             _mmf.Dispose();
+            _fileHandle.Dispose();
             _fileStream.Dispose();
         }
     }
