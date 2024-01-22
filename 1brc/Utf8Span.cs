@@ -52,7 +52,6 @@ namespace _1brc
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
         };
-        
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool Equals(Utf8Span other) //, bool isSimdSafe)
@@ -66,21 +65,74 @@ namespace _1brc
             // will not segfault. To avoid such a problem we ensure that it's safe to touch 64 bytes
             // from every new line in a chunk.
 
-            if (Vector256.IsHardwareAccelerated && Length <= (uint)Vector256<byte>.Count)
-            {
-                if (Length != other.Length)
-                    return false;
+            if (Length != other.Length)
+                return false;
 
-                var mask = Vector256.LoadUnsafe(in MemoryMarshal.GetReference(OnesAfterLength), (uint)Vector256<byte>.Count - Length);
-                var bytes = Vector256.Load(Pointer);
-                var otherBytes = Vector256.Load(other.Pointer);
-                var bytesAnd = Vector256.Equals(bytes, otherBytes) | mask;
-                var msbMask = Vector256.ExtractMostSignificantBits(bytesAnd);
-                var equals = msbMask == uint.MaxValue;
-                return equals;
+            const nuint vectorSize = 32;
+
+            if (Vector256.IsHardwareAccelerated)
+            {
+                if (Length <= vectorSize)
+                {
+                    var mask = Vector256.LoadUnsafe(in MemoryMarshal.GetReference(OnesAfterLength), (uint)Vector256<byte>.Count - Length);
+                    var bytes = Vector256.Load(Pointer);
+                    var otherBytes = Vector256.Load(other.Pointer);
+                    var bytesAnd = Vector256.Equals(bytes, otherBytes) | mask;
+                    var msbMask = Vector256.ExtractMostSignificantBits(bytesAnd);
+                    var equals = msbMask == uint.MaxValue;
+                    return equals;
+                }
+
+                return EqualsCont(this, other);
             }
 
             return Span.SequenceEqual(other.Span);
+
+            [MethodImpl(MethodImplOptions.NoInlining)]
+            static bool EqualsCont(Utf8Span left, Utf8Span right)
+            {
+                var bytes = Vector256.Load(left.Pointer);
+                var otherBytes = Vector256.Load(right.Pointer);
+                var bytesAnd = Vector256.Equals(bytes, otherBytes);
+                var msbMask = Vector256.ExtractMostSignificantBits(bytesAnd);
+                if (msbMask != uint.MaxValue)
+                    return false;
+
+                bytes = Vector256.Load(left.Pointer + vectorSize);
+                otherBytes = Vector256.Load(right.Pointer + vectorSize);
+                bytesAnd = Vector256.Equals(bytes, otherBytes);
+                if (left.Length <= vectorSize * 2)
+                {
+                    bytesAnd |= Vector256.LoadUnsafe(in MemoryMarshal.GetReference(OnesAfterLength), vectorSize * 2 - left.Length);
+                    msbMask = Vector256.ExtractMostSignificantBits(bytesAnd);
+                    return msbMask == uint.MaxValue;
+                }
+
+                msbMask = Vector256.ExtractMostSignificantBits(bytesAnd);
+                if (msbMask != uint.MaxValue)
+                    return false;
+
+                bytes = Vector256.Load(left.Pointer + vectorSize * 2);
+                otherBytes = Vector256.Load(right.Pointer + vectorSize * 2);
+                bytesAnd = Vector256.Equals(bytes, otherBytes);
+                if (left.Length <= vectorSize * 3)
+                {
+                    bytesAnd |= Vector256.LoadUnsafe(in MemoryMarshal.GetReference(OnesAfterLength), vectorSize * 3 - left.Length);
+                    msbMask = Vector256.ExtractMostSignificantBits(bytesAnd);
+                    return msbMask == uint.MaxValue;
+                }
+
+                msbMask = Vector256.ExtractMostSignificantBits(bytesAnd);
+                if (msbMask != uint.MaxValue)
+                    return false;
+
+                bytes = Vector256.Load(left.Pointer + vectorSize * 3);
+                otherBytes = Vector256.Load(right.Pointer + vectorSize * 3);
+                bytesAnd = Vector256.Equals(bytes, otherBytes);
+                bytesAnd |= Vector256.LoadUnsafe(in MemoryMarshal.GetReference(OnesAfterLength), vectorSize * 4 - left.Length);
+                msbMask = Vector256.ExtractMostSignificantBits(bytesAnd);
+                return msbMask == uint.MaxValue;
+            }
         }
 
         public override bool Equals(object? obj) => obj is Utf8Span other && Equals(other);
