@@ -327,7 +327,7 @@ namespace _1brc
             {
                 nuint idx = remaining.IndexOfSemicolon();
 
-                result.GetValueRefOrAddDefault(new Utf8Span(remaining.Pointer, idx)).Apply(remaining.ParseInt(idx, out idx));
+                result.GetValueRefOrAddDefault(new Utf8Span(remaining.Pointer, idx)).Apply(remaining.ParseIntBranchless(idx, out idx));
 
                 remaining = remaining.SliceUnsafe(idx);
             }

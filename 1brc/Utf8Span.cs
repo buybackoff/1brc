@@ -108,6 +108,25 @@ namespace _1brc
         public override string ToString() => new((sbyte*)Pointer, 0, (int)Length, Encoding.UTF8);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public nint ParseIntBranchless(nuint start, out nuint lfIndex) {
+            // I took it from artsiomkorzun, but he mentions merykitty, while noahfalk mentions RagnarGrootKoerkamp. The trace is lost
+            
+            const long DOT_BITS = 0x10101000;
+            const long MAGIC_MULTIPLIER = (100 * 0x1000000 + 10 * 0x10000 + 1);
+            
+            long word = *(long*)(Pointer + start + 1);
+            long inverted = ~word;
+            int dot = BitOperations.TrailingZeroCount(inverted & DOT_BITS);
+            long signed = (inverted << 59) >> 63;
+            long mask = ~(signed & 0xFF);
+            long digits = ((word & mask) << (28 - dot)) & 0x0F000F0F00L;
+            long abs = ((digits * MAGIC_MULTIPLIER) >>> 32) & 0x3FF;
+            int value = (int) ((abs ^ signed) - signed);
+            lfIndex = start + (uint)(dot >> 3) + 4u;
+            return value;
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public nint ParseInt(nuint start, out nuint lfIndex)
         {
             var ptr = Pointer + start + 1;
@@ -162,7 +181,7 @@ namespace _1brc
                     // A nicer version would be just a recursive call, even not here but above instead of this function.
                     // It's as fast for the default case and very close for 10K. Yet, this manually unrolled continuation is faster for 10K.   
                     // return vectorSize + span.SliceUnsafe(vectorSize).IndexOfSemicolon();
-                    
+
                     var sepVec = Vector256.Create((byte)';');
                     var matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(span.Pointer + vectorSize), sepVec);
                     var mask = (uint)Avx2.MoveMask(matches);
