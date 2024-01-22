@@ -213,7 +213,7 @@ namespace _1brc
         public unsafe void ProcessChunkMmapViewPerChunkRandom(FixedDictionary<Utf8Span, Summary> resultAcc, long start, uint length, int id)
         {
             var ratio = (double)(id + 1) / _chunks.Count;
-            var delta = (long)(0.45 * length * ratio);
+            var delta = (long)(0.49 * length * ratio);
             var length0 = length / 2 + delta;
             using (var accessor = _mmf.CreateViewAccessor(start, length0 + 1024, MemoryMappedFileAccess.Read))
             {
