@@ -5,9 +5,9 @@ namespace _1brc
     public struct Summary : ISpanFormattable
     {
         public nint Sum;
-        public nuint Count;
-        public nint Min;
-        public nint Max;
+        public uint Count;
+        public short Min;
+        public short Max;
 
         public double Average => (double)Sum / Count;
 
@@ -18,9 +18,9 @@ namespace _1brc
             Count++;
             // For normal real data (not an artificial sequence such as `0,-1,2,-3,4,-5,...`) the branches are not taken and we have less assignments. 
             if (value < Min)
-                Min = value;
+                Min = (short)value;
             if (value > Max)
-                Max = value;
+                Max = (short)value;
 
         }
 

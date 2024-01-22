@@ -247,9 +247,6 @@ namespace _1brc
 
             const int SEGMENT_SIZE = 512 * 1024;
 
-            // Refill the buffer when remaining is below than this
-            // const uint MIN_REMAINING_SIZE = 1024;
-
             byte[] buffer = new byte[SEGMENT_SIZE + MAX_LINE_SIZE];
 
             var chunkRemaining = (int)length;
@@ -276,11 +273,8 @@ namespace _1brc
 
         public void ProcessChunkRandomAccessAsync(FixedDictionary<Utf8Span, Summary> resultAcc, long start, uint length)
         {
-            using var fileHandle = File.OpenHandle(FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, FileOptions.Asynchronous);
+            using var fileHandle = File.OpenHandle(FilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, FileOptions.Asynchronous | FileOptions.SequentialScan);
             const int SEGMENT_SIZE = 512 * 1024;
-
-            // Refill the buffer when remaining is below than this
-            // const uint MIN_REMAINING_SIZE = 1024;
 
             byte[] buffer0 = GC.AllocateArray<byte>(SEGMENT_SIZE + MAX_LINE_SIZE, pinned: true);
             byte[] buffer1 = GC.AllocateArray<byte>(SEGMENT_SIZE + MAX_LINE_SIZE, pinned: true);
