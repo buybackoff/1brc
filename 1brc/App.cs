@@ -320,10 +320,9 @@ namespace _1brc
             while (remaining.Length > 0)
             {
                 nuint idx = remaining.IndexOfSemicolon();
-
-                result.GetValueRefOrAddDefault(new Utf8Span(remaining.Pointer, idx)).Apply(remaining.ParseIntBranchless(idx, out idx));
-
-                remaining = remaining.SliceUnsafe(idx);
+                nint value = remaining.ParseIntBranchless(idx, out var idx1);
+                result.GetValueRefOrAddDefault(new Utf8Span(remaining.Pointer, idx)).Apply(value);
+                remaining = remaining.SliceUnsafe(idx1);
             }
         }
 
