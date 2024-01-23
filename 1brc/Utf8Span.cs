@@ -173,9 +173,9 @@ namespace _1brc
             long mask = ~(signed & 0xFF);
             long digits = ((word & mask) << (28 - dot)) & 0x0F000F0F00L;
             long abs = ((digits * MAGIC_MULTIPLIER) >>> 32) & 0x3FF;
-            int value = (int) ((abs ^ signed) - signed);
+            var value = ((abs ^ signed) - signed);
             lfIndex = start + (uint)(dot >> 3) + 4u;
-            return value;
+            return (nint)value;
         }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
