@@ -223,7 +223,7 @@ namespace _1brc
                 nuint tzc = (uint)BitOperations.TrailingZeroCount(mask);
 
                 if (mask == 0) // For non-taken branches prefer placing them in a "leaf" instead of mask != 0, somewhere on GH they explain why, it would be nice to find. 
-                    return IndexOfSemicolonCont(this);
+                    tzc =  IndexOfSemicolonCont(this);
 
                 return tzc;
 
