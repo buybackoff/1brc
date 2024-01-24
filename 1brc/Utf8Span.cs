@@ -219,8 +219,8 @@ namespace _1brc
                 var sepVec = Vector256.Create((byte)';');
 
                 var matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(Pointer), sepVec);
-                var mask = (uint)Avx2.MoveMask(matches);
-                var tzc = (uint)BitOperations.TrailingZeroCount(mask);
+                var mask = Vector256.ExtractMostSignificantBits(matches);
+                nuint tzc = (uint)BitOperations.TrailingZeroCount(mask);
 
                 if (mask == 0) // For non-taken branches prefer placing them in a "leaf" instead of mask != 0, somewhere on GH they explain why, it would be nice to find. 
                     return IndexOfSemicolonCont(this);
@@ -236,21 +236,21 @@ namespace _1brc
 
                     var sepVec = Vector256.Create((byte)';');
                     var matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(span.Pointer + vectorSize), sepVec);
-                    var mask = (uint)Avx2.MoveMask(matches);
+                    var mask = Vector256.ExtractMostSignificantBits(matches);
                     var tzc = (uint)BitOperations.TrailingZeroCount(mask);
                     if (mask != 0)
                         return vectorSize + tzc;
 
                     const nuint vectorSize2 = 2 * vectorSize;
                     matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(span.Pointer + vectorSize2), sepVec);
-                    mask = (uint)Avx2.MoveMask(matches);
+                    mask = Vector256.ExtractMostSignificantBits(matches);
                     tzc = (uint)BitOperations.TrailingZeroCount(mask);
                     if (mask != 0)
                         return vectorSize2 + tzc;
 
                     const nuint vectorSize3 = 3 * vectorSize;
                     matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(span.Pointer + vectorSize3), sepVec);
-                    mask = (uint)Avx2.MoveMask(matches);
+                    mask = Vector256.ExtractMostSignificantBits(matches);
                     tzc = (uint)BitOperations.TrailingZeroCount(mask);
                     return vectorSize3 + tzc;
                 }
