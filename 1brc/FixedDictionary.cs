@@ -77,21 +77,21 @@ namespace _1brc
             uint fastMod = FastMod(hashCode);
             int bucket = _buckets.GetAtUnsafe(fastMod);
 
-            int i = bucket - 1; // Value in _buckets is 1-based
+            nuint i = (uint)bucket - 1; // Value in _buckets is 1-based
 
             while (true)
             {
-                if ((uint)i >= (uint)entries.Length) // Eliminates bound checks
+                if (i >= (uint)entries.Length) // Eliminates bound checks
                 {
                     break;
                 }
 
-                if (entries[i].hashCode == hashCode && entries[i].key.Equals(key))
+                if (entries.GetAtUnsafe(i).hashCode == hashCode && entries.GetAtUnsafe(i).key.Equals(key))
                 {
-                    return ref entries[i].value!;
+                    return ref entries.GetAtUnsafe(i).value!;
                 }
 
-                i = entries[i].next;
+                i = (uint)entries.GetAtUnsafe(i).next;
             }
 
             return ref Add(key, hashCode, fastMod);
