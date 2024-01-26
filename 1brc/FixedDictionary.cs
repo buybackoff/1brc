@@ -113,7 +113,8 @@ namespace _1brc
                 {
                     var targetPtr = _keys + _keysLength;
                     // For short keys (of length 1 and 3) we touch ; as a part of hash, e.g. read 1 byte beyond Utf8Span. Need to copy ; as well here.
-                    int utf8SpanLength = (int)utf8Span.Length + 1; 
+                    int utf8SpanLength = (utf8Span.Length == 1 || utf8Span.Length == 3) ? (int)utf8Span.Length + 1 : (int)utf8Span.Length; 
+                    // CopyBlockUnaligned(targetPtr, utf8Span.Pointer, (uint)utf8SpanLength);
                     var target = new Span<byte>(targetPtr, utf8SpanLength);
                     var source = new Span<byte>(utf8Span.Pointer, utf8SpanLength);
                     source.CopyTo(target);
