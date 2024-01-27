@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Numerics;
+using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
 using System.Text;
@@ -10,14 +11,44 @@ internal class Program
 {
     private static void Main(string[] args)
     {
-        var sw = Stopwatch.StartNew();
+        var path = args.Length > 0 ? args[0] : "D:/tmp/measurements_1B.txt";
+        
         Console.OutputEncoding = Encoding.UTF8;
-        var path = args.Length > 0 ? args[0] : "D:/tmp/measurements_1B_10K.txt";
+        
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) || args.Contains("--worker"))
+            DoWork(path);
+        else
+            StartSubprocess(path);
+    }
+
+    private static void DoWork(string path)
+    {
         using (var app = new App(path))
         {
+            var sw = Stopwatch.StartNew();
             app.PrintResult();
+            sw.Stop();
+            Console.Out.Close();
         }
-        sw.Stop();
-        Console.WriteLine($"Finished in: {sw.ElapsedMilliseconds:N0} ms");
+    }
+
+    private static void StartSubprocess(string path)
+    {
+        string parentProcessPath = Process.GetCurrentProcess().MainModule!.FileName;
+
+        Console.WriteLine($"CMD: -c \"{parentProcessPath} {path} --worker & \" ");
+
+        var processStartInfo = new ProcessStartInfo
+        {
+            FileName = "sh", // parentProcessPath,
+            Arguments = $"-c \"{parentProcessPath} {path} --worker & \" ",
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+            CreateNoWindow = false,
+        };
+        
+        var process = Process.Start(processStartInfo);
+        string? output = process!.StandardOutput.ReadLine();
+        Console.Write(output);
     }
 }

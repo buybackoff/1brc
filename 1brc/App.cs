@@ -51,7 +51,7 @@ namespace _1brc
         public unsafe App(string filePath, int? threadCount = null, ProcessMode processMode = ProcessMode.Default)
         {
             if (processMode == default)
-                processMode = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? ProcessMode.RandomAccessAsync : ProcessMode.MmapViewPerChunkRandom;
+                processMode = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? ProcessMode.RandomAccessAsync : ProcessMode.MmapSingleSharedPos;
 
             _processMode = processMode;
 
@@ -426,7 +426,7 @@ namespace _1brc
 
             var strResult = sb.ToString();
             // File.WriteAllText($"D:/tmp/results/buybackoff_{DateTime.Now:yy-MM-dd_hhmmss}.txt", strResult);
-            // Console.WriteLine(strResult);
+            Console.WriteLine(strResult);
 
             result.Dispose();
 
