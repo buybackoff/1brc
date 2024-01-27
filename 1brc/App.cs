@@ -363,7 +363,7 @@ namespace _1brc
             while (remaining.Length > 0)
             {
                 nuint idx = remaining.IndexOfSemicolon();
-                nint value = remaining.ParseIntBranchless(idx, out var idx1);
+                nint value = remaining.ParseInt(idx, out var idx1);
                 result.GetValueRefOrAddDefault(new Utf8Span(remaining.Pointer, idx)).Apply(value);
                 remaining = remaining.SliceUnsafe(idx1);
             }

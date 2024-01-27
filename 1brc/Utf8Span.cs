@@ -149,12 +149,13 @@ namespace _1brc
         public override string ToString() => new((sbyte*)Pointer, 0, (int)Length, Encoding.UTF8);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public nint ParseIntBranchless(nuint start, out nuint lfIndex) {
+        public nint ParseInt(nuint start, out nuint lfIndex)
+        {
             // I took it from artsiomkorzun, but he mentions merykitty, while noahfalk mentions RagnarGrootKoerkamp. The trace is lost
-            
+
             const long DOT_BITS = 0x10101000;
             const long MAGIC_MULTIPLIER = (100 * 0x1000000 + 10 * 0x10000 + 1);
-            
+
             long word = *(long*)(Pointer + start + 1);
             long inverted = ~word;
             int dot = BitOperations.TrailingZeroCount(inverted & DOT_BITS);
@@ -166,42 +167,11 @@ namespace _1brc
             lfIndex = start + (uint)(dot >> 3) + 4u;
             return (nint)value;
         }
-        
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public nint ParseInt(nuint start, out nuint lfIndex)
-        {
-            var ptr = Pointer + start + 1;
-            int sign;
 
-            if (*ptr == (byte)'-')
-            {
-                ptr++;
-                sign = -1;
-                lfIndex = start + 6;
-            }
-            else
-            {
-                sign = 1;
-                lfIndex = start + 5;
-            }
-
-            if (ptr[1] != '.')
-            {
-                lfIndex++;
-                return (nint)(ptr[0] * 100u + ptr[1] * 10u + ptr[3] - '0' * 111u) * sign;
-            }
-
-            return (nint)(ptr[0] * 10u + ptr[2] - ('0' * 11u)) * sign;
-        }
-
-        /// <summary>
-        /// Spec: Station name: non null UTF-8 string of min length 1 character and max length 100 bytes (i.e. this could be 100 one-byte characters, or 50 two-byte characters, etc.)
-        /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal nuint IndexOfSemicolon()
         {
             const nuint vectorSize = 32;
-            // nuint start = 0; // it's consistently faster with this useless variable (non constant)
 
             if (Vector256.IsHardwareAccelerated)
             {
@@ -209,40 +179,31 @@ namespace _1brc
 
                 var matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(Pointer), sepVec);
                 var mask = Vector256.ExtractMostSignificantBits(matches);
-                nuint tzc = (uint)BitOperations.TrailingZeroCount(mask);
+                var idx = (nuint)BitOperations.TrailingZeroCount(mask);
 
-                if (mask == 0) // For non-taken branches prefer placing them in a "leaf" instead of mask != 0, somewhere on GH they explain why, it would be nice to find. 
-                    tzc =  IndexOfSemicolonCont(this);
-
-                return tzc;
-
-                [MethodImpl(MethodImplOptions.NoInlining)]
-                static nuint IndexOfSemicolonCont(Utf8Span span)
+                if (mask == 0) // 32-63
                 {
-                    // A nicer version would be just a recursive call, even not here but above instead of this function.
-                    // It's as fast for the default case and very close for 10K. Yet, this manually unrolled continuation is faster for 10K.   
-                    // return vectorSize + span.SliceUnsafe(vectorSize).IndexOfSemicolon();
-
-                    var sepVec = Vector256.Create((byte)';');
-                    var matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(span.Pointer + vectorSize), sepVec);
-                    var mask = Vector256.ExtractMostSignificantBits(matches);
-                    var tzc = (uint)BitOperations.TrailingZeroCount(mask);
-                    if (mask != 0)
-                        return vectorSize + tzc;
-
-                    const nuint vectorSize2 = 2 * vectorSize;
-                    matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(span.Pointer + vectorSize2), sepVec);
+                    matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(Pointer + vectorSize), sepVec);
                     mask = Vector256.ExtractMostSignificantBits(matches);
-                    tzc = (uint)BitOperations.TrailingZeroCount(mask);
-                    if (mask != 0)
-                        return vectorSize2 + tzc;
+                    idx = vectorSize + (uint)BitOperations.TrailingZeroCount(mask);
+                    
+                    if (mask == 0) // 64-95
+                    {
+                        // const nuint vectorSize2 = 2 * vectorSize;
+                        matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(Pointer + 2 * vectorSize), sepVec);
+                        mask = Vector256.ExtractMostSignificantBits(matches);
+                        idx = 2 * vectorSize + (uint)BitOperations.TrailingZeroCount(mask);
 
-                    const nuint vectorSize3 = 3 * vectorSize;
-                    matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(span.Pointer + vectorSize3), sepVec);
-                    mask = Vector256.ExtractMostSignificantBits(matches);
-                    tzc = (uint)BitOperations.TrailingZeroCount(mask);
-                    return vectorSize3 + tzc;
+                        if (mask == 0) // 96-127
+                        {
+                            matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(Pointer + 3 * vectorSize), sepVec);
+                            mask = Vector256.ExtractMostSignificantBits(matches);
+                            idx = 3 * vectorSize + (uint)BitOperations.TrailingZeroCount(mask);
+                        }
+                    }
                 }
+
+                return idx;
             }
 
             return IndexOf(0, (byte)';');
