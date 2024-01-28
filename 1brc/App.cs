@@ -1,7 +1,10 @@
 ﻿using System.Diagnostics;
 using System.IO.MemoryMappedFiles;
+using System.Numerics;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Runtime.Intrinsics;
 using System.Text;
 using Microsoft.Win32.SafeHandles;
 
@@ -187,7 +190,7 @@ namespace _1brc
 #if DEBUG
             Console.WriteLine($"Thread {id} finished at: {DateTime.UtcNow:hh:mm:ss.ffffff}");
 #endif
-            
+
             if (Interlocked.Increment(ref _threadsFinished) == 1) // first thread finished
             {
 #if DEBUG
@@ -210,7 +213,7 @@ namespace _1brc
         public unsafe void ProcessChunkMmapSingleSharedPos(FixedDictionary<Utf8Span, Summary> resultAcc, long _, long __)
         {
             const int SEGMENT_SIZE = 4 * 1024 * 1024;
-            
+
             var ptr0 = (byte*)_pointer;
             while (true)
             {
@@ -237,7 +240,10 @@ namespace _1brc
                 Debug.Assert(ptr0[end - 1] == LF, "ptr0[end - 1] == LF");
 #endif
 
-                ProcessSpan(resultAcc, new Utf8Span(ptr0 + start, (uint)(end - start)));
+                if (Vector256.IsHardwareAccelerated)
+                    ProcessSpan2(resultAcc, new Utf8Span(ptr0 + start, (uint)(end - start)));
+                else
+                    ProcessSpan(resultAcc, new Utf8Span(ptr0 + start, (uint)(end - start)));
 
                 if (end == _leftoverStart)
                     break;
@@ -366,6 +372,73 @@ namespace _1brc
                 nint value = remaining.ParseInt(idx, out var idx1);
                 result.GetValueRefOrAddDefault(new Utf8Span(remaining.Pointer, idx)).Apply(value);
                 remaining = remaining.SliceUnsafe(idx1);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static unsafe void ProcessSpan2(FixedDictionary<Utf8Span, Summary> result, Utf8Span remaining)
+        {
+            Debug.Assert(Vector256.IsHardwareAccelerated);
+            
+            const nuint vectorSize = 32;
+            var sepVec = Vector256.Create((byte)';');
+            var ptr = remaining.Pointer;
+            var remLen = remaining.Length;
+
+            while (remLen > 0)
+            {
+                nuint idx;
+                nint value;
+                var matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(ptr), sepVec);
+                var mask = Vector256.ExtractMostSignificantBits(matches);
+
+                idx = (nuint)BitOperations.TrailingZeroCount(mask);
+                value = ParseInt(ptr, idx, out nuint idx1);
+                
+                if (mask == 0) // 32-63
+                {
+                    matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(ptr + vectorSize), sepVec);
+                    mask = Vector256.ExtractMostSignificantBits(matches);
+                    idx = vectorSize + (uint)BitOperations.TrailingZeroCount(mask);
+                    
+                    if (mask == 0) // 64-95
+                    {
+                        // const nuint vectorSize2 = 2 * vectorSize;
+                        matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(ptr + 2 * vectorSize), sepVec);
+                        mask = Vector256.ExtractMostSignificantBits(matches);
+                        idx = 2 * vectorSize + (uint)BitOperations.TrailingZeroCount(mask);
+                        
+                        if (mask == 0) // 96-127
+                        {
+                            matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(ptr + 3 * vectorSize), sepVec);
+                            mask = Vector256.ExtractMostSignificantBits(matches);
+                            idx = 3 * vectorSize + (uint)BitOperations.TrailingZeroCount(mask);
+                        }
+                    }
+                    value = ParseInt(ptr, idx, out idx1);
+                }
+                
+                result.GetValueRefOrAddDefault(new Utf8Span(ptr, idx)).Apply(value);
+                ptr += idx1;
+                remLen -= idx1;
+            }
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            static nint ParseInt(byte* ptr, nuint start, out nuint lfIndex)
+            {
+                const long DOT_BITS = 0x10101000;
+                const long MAGIC_MULTIPLIER = (100 * 0x1000000 + 10 * 0x10000 + 1);
+
+                long word = *(long*)(ptr + start + 1);
+                long inverted = ~word;
+                int dot = BitOperations.TrailingZeroCount(inverted & DOT_BITS);
+                long signed = (inverted << 59) >> 63;
+                long mask = ~(signed & 0xFF);
+                long digits = ((word & mask) << (28 - dot)) & 0x0F000F0F00L;
+                long abs = ((digits * MAGIC_MULTIPLIER) >>> 32) & 0x3FF;
+                var value = ((abs ^ signed) - signed);
+                lfIndex = start + (uint)(dot >> 3) + 4u;
+                return (nint)value;
             }
         }
 
