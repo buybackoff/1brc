@@ -66,6 +66,32 @@ namespace _1brc
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public bool TryUpdate(TKey key, nint value)
+        {
+            Entry[] entries = _entries;
+
+            uint hashCode = (uint)key.GetHashCode();
+
+            uint fastMod = FastMod(hashCode);
+            int bucket = _buckets.GetAtUnsafe(fastMod);
+
+            nuint i = (uint)bucket - 1;
+            if (i >= (uint)entries.Length)
+                return false;
+
+            if (typeof(TValue) == typeof(Summary))
+            {
+                if (entries.GetAtUnsafe(i).hashCode == hashCode && entries.GetAtUnsafe(i).key.Equals(key))
+                {
+                    ((Summary)(object)entries.GetAtUnsafe(i).value!).Apply(value);
+                    return true;
+                }
+            }
+            
+            return false;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public ref TValue GetValueRefOrAddDefault(TKey key)
         {
             Entry[] entries = _entries;
@@ -113,7 +139,7 @@ namespace _1brc
                 {
                     var targetPtr = _keys + _keysLength;
                     // For short keys (of length 1 and 3) we touch ; as a part of hash, e.g. read 1 byte beyond Utf8Span. Need to copy ; as well here.
-                    int utf8SpanLength = utf8Span.Length <= 3 ? (int)utf8Span.Length + 1 : (int)utf8Span.Length; 
+                    int utf8SpanLength = utf8Span.Length <= 3 ? (int)utf8Span.Length + 1 : (int)utf8Span.Length;
                     // CopyBlockUnaligned(targetPtr, utf8Span.Pointer, (uint)utf8SpanLength);
                     var target = new Span<byte>(targetPtr, utf8SpanLength);
                     var source = new Span<byte>(utf8Span.Pointer, utf8SpanLength);

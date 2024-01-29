@@ -235,7 +235,7 @@ namespace _1brc
 
 #if DEBUG
                 Console.WriteLine($"SEGMENT: {start:N0} - {end:N0} -> {(end - start):N0}");
-                if(start > 0)
+                if (start > 0)
                     Debug.Assert(ptr0[start - 1] == LF, "ptr0[start - 1] == LF");
                 Debug.Assert(ptr0[end - 1] == LF, "ptr0[end - 1] == LF");
 #endif
@@ -379,45 +379,64 @@ namespace _1brc
         public static unsafe void ProcessSpan2(FixedDictionary<Utf8Span, Summary> result, Utf8Span remaining)
         {
             Debug.Assert(Vector256.IsHardwareAccelerated);
-            
+
             const nuint vectorSize = 32;
             var sepVec = Vector256.Create((byte)';');
             var ptr = remaining.Pointer;
             var remLen = remaining.Length;
 
-            while (remLen > 0)
+            while (true)
             {
+                if (remLen <= 0)
+                    break;
+
                 nuint idx;
+                nuint idx1;
                 nint value;
                 var matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(ptr), sepVec);
                 var mask = Vector256.ExtractMostSignificantBits(matches);
 
-                idx = (nuint)BitOperations.TrailingZeroCount(mask);
-                value = ParseInt(ptr, idx, out nuint idx1);
-                
-                if (mask == 0) // 32-63
+                if (mask != 0)
+                {
+                    idx = (nuint)BitOperations.TrailingZeroCount(mask);
+                    value = ParseInt(ptr, idx, out idx1);
+                    if (result.TryUpdate(new Utf8Span(ptr, idx), value))
+                    {
+                        ptr += idx1;
+                        remLen -= idx1;
+                        continue;
+                    }
+                }
+                else // 32-63
                 {
                     matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(ptr + vectorSize), sepVec);
                     mask = Vector256.ExtractMostSignificantBits(matches);
-                    idx = vectorSize + (uint)BitOperations.TrailingZeroCount(mask);
-                    
-                    if (mask == 0) // 64-95
+
+                    if (mask != 0) // 64-95
                     {
-                        // const nuint vectorSize2 = 2 * vectorSize;
+                        idx = vectorSize + (uint)BitOperations.TrailingZeroCount(mask);
+                        value = ParseInt(ptr, idx, out idx1);
+                    }
+                    else
+                    {
                         matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(ptr + 2 * vectorSize), sepVec);
                         mask = Vector256.ExtractMostSignificantBits(matches);
-                        idx = 2 * vectorSize + (uint)BitOperations.TrailingZeroCount(mask);
-                        
-                        if (mask == 0) // 96-127
+
+                        if (mask != 0) // 96-127
+                        {
+                            idx = 2 * vectorSize + (uint)BitOperations.TrailingZeroCount(mask);
+                            value = ParseInt(ptr, idx, out idx1);
+                        }
+                        else
                         {
                             matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(ptr + 3 * vectorSize), sepVec);
                             mask = Vector256.ExtractMostSignificantBits(matches);
                             idx = 3 * vectorSize + (uint)BitOperations.TrailingZeroCount(mask);
+                            value = ParseInt(ptr, idx, out idx1);
                         }
                     }
-                    value = ParseInt(ptr, idx, out idx1);
                 }
-                
+
                 result.GetValueRefOrAddDefault(new Utf8Span(ptr, idx)).Apply(value);
                 ptr += idx1;
                 remLen -= idx1;
