@@ -81,7 +81,7 @@ namespace _1brc
 
             if (typeof(TValue) == typeof(Summary))
             {
-                if (entries.GetAtUnsafe(i).hashCode == hashCode && entries.GetAtUnsafe(i).key.Equals(key))
+                if (entries.GetAtUnsafe(i).key.Equals(key))
                 {
                     ((Summary)(object)entries.GetAtUnsafe(i).value!).Apply(value);
                     return true;
