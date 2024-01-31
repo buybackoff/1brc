@@ -380,63 +380,59 @@ namespace _1brc
             Debug.Assert(Vector256.IsHardwareAccelerated);
 
             const nuint vectorSize = 32;
-            var sepVec = Vector256.Create((byte)';');
-            var ptr = remaining.Pointer;
-            var remLen = remaining.Length;
 
             while (true)
             {
-                if (remLen <= 0)
+                if (remaining.Length <= 0)
                     break;
 
                 nuint idx;
                 nuint idx1;
                 nint value;
-                var matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(ptr), sepVec);
+                var matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(remaining.Pointer), Vector256.Create((byte)';'));
                 var mask = matches.ExtractMostSignificantBits();
 
                 if (mask != 0)
                 {
                     idx = (nuint)BitOperations.TrailingZeroCount(mask);
-                    value = ParseInt(ptr, idx, out idx1);
-                    if (result.TryUpdate(new Utf8Span(ptr, idx), value))
+                    value = ParseInt(remaining.Pointer, idx, out idx1);
+                    if (result.TryUpdate(new Utf8Span(remaining.Pointer, idx), value))
                         goto DONE;
                 }
                 else // 32-63
                 {
-                    matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(ptr + vectorSize), sepVec);
+                    matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(remaining.Pointer + vectorSize), Vector256.Create((byte)';'));
                     mask = matches.ExtractMostSignificantBits();
 
                     if (mask != 0) // 64-95
                     {
                         idx = vectorSize + (uint)BitOperations.TrailingZeroCount(mask);
-                        value = ParseInt(ptr, idx, out idx1);
+                        value = ParseInt(remaining.Pointer, idx, out idx1);
                     }
                     else
                     {
-                        matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(ptr + 2 * vectorSize), sepVec);
+                        matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(remaining.Pointer + 2 * vectorSize), Vector256.Create((byte)';'));
                         mask = matches.ExtractMostSignificantBits();
 
                         if (mask != 0) // 96-127
                         {
                             idx = 2 * vectorSize + (uint)BitOperations.TrailingZeroCount(mask);
-                            value = ParseInt(ptr, idx, out idx1);
+                            value = ParseInt(remaining.Pointer, idx, out idx1);
                         }
                         else
                         {
-                            matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(ptr + 3 * vectorSize), sepVec);
+                            matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(remaining.Pointer + 3 * vectorSize), Vector256.Create((byte)';'));
                             mask = matches.ExtractMostSignificantBits();
                             idx = 3 * vectorSize + (uint)BitOperations.TrailingZeroCount(mask);
-                            value = ParseInt(ptr, idx, out idx1);
+                            value = ParseInt(remaining.Pointer, idx, out idx1);
                         }
                     }
                 }
 
-                result.GetValueRefOrAddDefault(new Utf8Span(ptr, idx)).Apply(value);
+                result.GetValueRefOrAddDefault(new Utf8Span(remaining.Pointer, idx)).Apply(value);
                 
                 DONE:
-                ptr += idx1;
-                remLen -= idx1;
+                remaining = remaining.SliceUnsafe(idx1);
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
