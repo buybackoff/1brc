@@ -140,10 +140,10 @@ namespace _1brc
 
             const uint prime = 16777619u;
 
-            if (Length >= 3)
-                return (int)(((uint)Length * prime) ^ (*(uint*)(Pointer)));
+            return Length >= 3 // no, moving condition inside does not help
+                ? (int)((*(uint*)Pointer * prime) ^ ((uint)Length)) 
+                : (int)((*(ushort*)Pointer * prime) ^ ((uint)Length));
 
-            return (int)(uint)(*(ushort*)Pointer * prime);
         }
 
         public override string ToString() => new((sbyte*)Pointer, 0, (int)Length, Encoding.UTF8);
