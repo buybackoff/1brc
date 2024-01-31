@@ -71,23 +71,22 @@ namespace _1brc
             Entry[] entries = _entries;
 
             uint hashCode = (uint)key.GetHashCode();
-
             uint fastMod = FastMod(hashCode);
             int bucket = _buckets.GetAtUnsafe(fastMod);
 
             nuint i = (uint)bucket - 1;
-            if (i >= (uint)entries.Length)
-                return false;
-
-            if (typeof(TValue) == typeof(Summary))
+            if (i < (uint)entries.Length)
             {
-                if (entries.GetAtUnsafe(i).key.Equals(key))
+                if (typeof(TValue) == typeof(Summary))
                 {
-                    ((Summary)(object)entries.GetAtUnsafe(i).value!).Apply(value);
-                    return true;
+                    if (entries.GetAtUnsafe(i).key.Equals(key))
+                    {
+                        ((Summary)(object)entries.GetAtUnsafe(i).value!).Apply(value);
+                        return true;
+                    }
                 }
             }
-            
+
             return false;
         }
 
@@ -126,7 +125,6 @@ namespace _1brc
         [MethodImpl(MethodImplOptions.NoInlining)]
         private ref TValue Add(TKey key, uint hashCode, uint fastMod)
         {
-
             int index = _count++;
 
             if (typeof(TKey) == typeof(Utf8Span))
