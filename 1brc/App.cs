@@ -240,7 +240,7 @@ namespace _1brc
 #endif
 
                 if (Vector256.IsHardwareAccelerated)
-                    ProcessSpan2(resultAcc, new Utf8Span(ptr0 + start, (uint)(end - start)));
+                    ProcessSpanX2(resultAcc, new Utf8Span(ptr0 + start, (uint)(end - start)));
                 else
                     ProcessSpan(resultAcc, new Utf8Span(ptr0 + start, (uint)(end - start)));
 
@@ -265,7 +265,6 @@ namespace _1brc
             var length0 = length / 2 + delta;
             using (var accessor = _mmf.CreateViewAccessor(start, length0 + 1024, MemoryMappedFileAccess.Read))
             {
-
                 byte* ptr = default;
                 accessor.SafeMemoryMappedViewHandle.AcquirePointer(ref ptr);
                 ptr += accessor.PointerOffset;
@@ -368,90 +367,169 @@ namespace _1brc
             while (remaining.Length > 0)
             {
                 nuint idx = remaining.IndexOfSemicolon();
-                nint value = remaining.ParseInt(idx, out var idx1);
-                result.GetValueRefOrAddDefault(new Utf8Span(remaining.Pointer, idx)).Apply(value);
-                remaining = remaining.SliceUnsafe(idx1);
+                nint value = remaining.ParseInt(idx, out var nextStart);
+                result.Update(new Utf8Span(remaining.Pointer, idx), value);
+                remaining = remaining.SliceUnsafe(nextStart);
             }
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        public static unsafe void ProcessSpan2(FixedDictionary<Utf8Span, Summary> result, Utf8Span remaining)
+        public static void ProcessSpanX2(FixedDictionary<Utf8Span, Summary> result, Utf8Span chunk)
         {
-            Debug.Assert(Vector256.IsHardwareAccelerated);
+            nuint middle = chunk.Length / 2;
+            middle += (uint)chunk.SliceUnsafe(middle).Span.IndexOf((byte)'\n') + 1;
+            var chunk0 = chunk.SliceUnsafe(0, (uint)middle);
+            var chunk1 = chunk.SliceUnsafe((uint)middle);
+            ProcessSpan(result, chunk0, chunk1);
+        }
 
-            const nuint vectorSize = 32;
-
+        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+        public static unsafe void ProcessSpan(FixedDictionary<Utf8Span, Summary> result, Utf8Span chunk0, Utf8Span chunk1)
+        {
             while (true)
             {
-                if (remaining.Length <= 0)
+                if (chunk0.Length <= 0)
                     break;
 
-                nuint idx;
-                nuint idx1;
-                nint value;
-                var matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(remaining.Pointer), Vector256.Create((byte)';'));
-                var mask = matches.ExtractMostSignificantBits();
+                if (chunk1.Length <= 0)
+                    break;
 
-                if (mask != 0)
-                {
-                    idx = (nuint)BitOperations.TrailingZeroCount(mask);
-                    value = ParseInt(remaining.Pointer, idx, out idx1);
-                    if (result.TryUpdate(new Utf8Span(remaining.Pointer, idx), value))
-                        goto DONE;
-                }
-                else // 32-63
-                {
-                    matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(remaining.Pointer + vectorSize), Vector256.Create((byte)';'));
-                    mask = matches.ExtractMostSignificantBits();
+                nuint idx0 = chunk0.IndexOfSemicolon();
+                nuint idx1 = chunk1.IndexOfSemicolon();
 
-                    if (mask != 0) // 64-95
-                    {
-                        idx = vectorSize + (uint)BitOperations.TrailingZeroCount(mask);
-                        value = ParseInt(remaining.Pointer, idx, out idx1);
-                    }
-                    else
-                    {
-                        matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(remaining.Pointer + 2 * vectorSize), Vector256.Create((byte)';'));
-                        mask = matches.ExtractMostSignificantBits();
+                nint value0 = chunk0.ParseInt(idx0, out var nextStart0);
+                nint value1 = chunk1.ParseInt(idx1, out var nextStart1);
 
-                        if (mask != 0) // 96-127
-                        {
-                            idx = 2 * vectorSize + (uint)BitOperations.TrailingZeroCount(mask);
-                            value = ParseInt(remaining.Pointer, idx, out idx1);
-                        }
-                        else
-                        {
-                            matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(remaining.Pointer + 3 * vectorSize), Vector256.Create((byte)';'));
-                            mask = matches.ExtractMostSignificantBits();
-                            idx = 3 * vectorSize + (uint)BitOperations.TrailingZeroCount(mask);
-                            value = ParseInt(remaining.Pointer, idx, out idx1);
-                        }
-                    }
-                }
+                result.Update(new Utf8Span(chunk0.Pointer, idx0), value0);
+                result.Update(new Utf8Span(chunk1.Pointer, idx1), value1);
 
-                result.GetValueRefOrAddDefault(new Utf8Span(remaining.Pointer, idx)).Apply(value);
-                
-                DONE:
-                remaining = remaining.SliceUnsafe(idx1);
+                chunk0 = chunk0.SliceUnsafe(nextStart0);
+                chunk1 = chunk1.SliceUnsafe(nextStart1);
             }
 
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            static nint ParseInt(byte* ptr, nuint start, out nuint lfIndex)
+            ProcessSpan(result, chunk0);
+            ProcessSpan(result, chunk1);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static void ProcessSpanX3(FixedDictionary<Utf8Span, Summary> result, Utf8Span chunk)
+        {
+            nuint third = chunk.Length / 3;
+            var oneThird = third + (uint)chunk.SliceUnsafe(third).Span.IndexOf((byte)'\n') + 1;
+            var twoThirds = third * 2 + (uint)chunk.SliceUnsafe(third * 2).Span.IndexOf((byte)'\n') + 1;
+
+            var chunk0 = chunk.SliceUnsafe(0, (uint)oneThird);
+            var chunk1 = chunk.SliceUnsafe((uint)oneThird, twoThirds - oneThird);
+            var chunk2 = chunk.SliceUnsafe(twoThirds);
+
+            Debug.Assert(chunk0.Length > 0);
+            Debug.Assert(chunk1.Length > 0);
+            Debug.Assert(chunk2.Length > 0);
+            Debug.Assert(chunk0.Length + chunk1.Length + chunk2.Length == chunk.Length);
+
+            ProcessSpan(result, chunk0, chunk1, chunk2);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+        public static unsafe void ProcessSpan(FixedDictionary<Utf8Span, Summary> result, Utf8Span chunk0, Utf8Span chunk1, Utf8Span chunk2)
+        {
+            while (true)
             {
-                const long DOT_BITS = 0x10101000;
-                const long MAGIC_MULTIPLIER = (100 * 0x1000000 + 10 * 0x10000 + 1);
+                if (chunk0.Length <= 0)
+                    break;
 
-                long word = *(long*)(ptr + start + 1);
-                long inverted = ~word;
-                int dot = BitOperations.TrailingZeroCount(inverted & DOT_BITS);
-                long signed = (inverted << 59) >> 63;
-                long mask = ~(signed & 0xFF);
-                long digits = ((word & mask) << (28 - dot)) & 0x0F000F0F00L;
-                long abs = ((digits * MAGIC_MULTIPLIER) >>> 32) & 0x3FF;
-                var value = ((abs ^ signed) - signed);
-                lfIndex = start + (uint)(dot >> 3) + 4u;
-                return (nint)value;
+                if (chunk1.Length <= 0)
+                    break;
+
+                if (chunk2.Length <= 0)
+                    break;
+
+                nuint idx0 = chunk0.IndexOfSemicolon();
+                nuint idx1 = chunk1.IndexOfSemicolon();
+                nuint idx2 = chunk2.IndexOfSemicolon();
+
+                nint value0 = chunk0.ParseInt(idx0, out var nextStart0);
+                nint value1 = chunk1.ParseInt(idx1, out var nextStart1);
+                nint value2 = chunk2.ParseInt(idx2, out var nextStart2);
+
+                result.Update(new Utf8Span(chunk0.Pointer, idx0), value0);
+                result.Update(new Utf8Span(chunk1.Pointer, idx1), value1);
+                result.Update(new Utf8Span(chunk2.Pointer, idx2), value2);
+
+                chunk0 = chunk0.SliceUnsafe(nextStart0);
+                chunk1 = chunk1.SliceUnsafe(nextStart1);
+                chunk2 = chunk2.SliceUnsafe(nextStart2);
             }
+
+            ProcessSpan(result, chunk0);
+            ProcessSpan(result, chunk1);
+            ProcessSpan(result, chunk2);
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static void ProcessSpanX4(FixedDictionary<Utf8Span, Summary> result, Utf8Span chunk)
+        {
+            nuint q = chunk.Length / 4;
+            var one4 = q + (uint)chunk.SliceUnsafe(q).Span.IndexOf((byte)'\n') + 1;
+            var two4 = q * 2 + (uint)chunk.SliceUnsafe(q * 2).Span.IndexOf((byte)'\n') + 1;
+            var three4 = q * 3 + (uint)chunk.SliceUnsafe(q * 3).Span.IndexOf((byte)'\n') + 1;
+
+            var chunk0 = chunk.SliceUnsafe(0, (uint)one4);
+            var chunk1 = chunk.SliceUnsafe((uint)one4, two4 - one4);
+            var chunk2 = chunk.SliceUnsafe(two4, three4 - two4);
+            var chunk3 = chunk.SliceUnsafe(three4);
+
+            Debug.Assert(chunk0.Length > 0);
+            Debug.Assert(chunk1.Length > 0);
+            Debug.Assert(chunk2.Length > 0);
+            Debug.Assert(chunk3.Length > 0);
+            Debug.Assert(chunk0.Length + chunk1.Length + chunk2.Length + chunk3.Length == chunk.Length);
+
+            ProcessSpan(result, chunk0, chunk1, chunk2, chunk3);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+        public static unsafe void ProcessSpan(FixedDictionary<Utf8Span, Summary> result, Utf8Span chunk0, Utf8Span chunk1, Utf8Span chunk2, Utf8Span chunk3)
+        {
+            while (true)
+            {
+                if (chunk0.Length <= 0)
+                    break;
+
+                if (chunk1.Length <= 0)
+                    break;
+
+                if (chunk2.Length <= 0)
+                    break;
+
+                if (chunk3.Length <= 0)
+                    break;
+
+                nuint idx0 = chunk0.IndexOfSemicolon();
+                nuint idx1 = chunk1.IndexOfSemicolon();
+                nuint idx2 = chunk2.IndexOfSemicolon();
+                nuint idx3 = chunk3.IndexOfSemicolon();
+
+                nint value0 = chunk0.ParseInt(idx0, out var nextStart0);
+                nint value1 = chunk1.ParseInt(idx1, out var nextStart1);
+                nint value2 = chunk2.ParseInt(idx2, out var nextStart2);
+                nint value3 = chunk3.ParseInt(idx3, out var nextStart3);
+
+                result.Update(new Utf8Span(chunk0.Pointer, idx0), value0);
+                result.Update(new Utf8Span(chunk1.Pointer, idx1), value1);
+                result.Update(new Utf8Span(chunk2.Pointer, idx2), value2);
+                result.Update(new Utf8Span(chunk3.Pointer, idx3), value3);
+
+                chunk0 = chunk0.SliceUnsafe(nextStart0);
+                chunk1 = chunk1.SliceUnsafe(nextStart1);
+                chunk2 = chunk2.SliceUnsafe(nextStart2);
+                chunk3 = chunk3.SliceUnsafe(nextStart3);
+            }
+
+            ProcessSpan(result, chunk0);
+            ProcessSpan(result, chunk1);
+            ProcessSpan(result, chunk2);
+            ProcessSpan(result, chunk3);
         }
 
         public FixedDictionary<Utf8Span, Summary> Process()
