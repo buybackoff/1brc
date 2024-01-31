@@ -2,7 +2,6 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
-using System.Runtime.Intrinsics.X86;
 using System.Text;
 
 namespace _1brc
@@ -72,17 +71,15 @@ namespace _1brc
 
             if (Vector256.IsHardwareAccelerated)
             {
-                var bytes = Vector256.Load(Pointer);
-                var otherBytes = Vector256.Load(other.Pointer);
-                var bytesAnd = Vector256.Equals(bytes, otherBytes);
+                var equalsMask = Vector256.Equals(Vector256.Load(Pointer), Vector256.Load(other.Pointer))
+                               | Vector256.LessThanOrEqual(
+                                   Vector256.Create((byte)Length),
+                                   Vector256.Create((byte)0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31)
+                               );
 
-                var lenVec = Vector256.Create((byte)Length);
-                var indices = Vector256.Create((byte)0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31);
-                var onesAfterLength = Vector256.LessThanOrEqual(lenVec, indices);
-                bytesAnd |= onesAfterLength;
+                if (equalsMask.ExtractMostSignificantBits() != uint.MaxValue)
+                    return false;
 
-                var equals = uint.MaxValue == Vector256.ExtractMostSignificantBits(bytesAnd);
-                if (!equals) return false;
                 return Length <= vectorSize || EqualsCont(this, other);
             }
 
@@ -98,10 +95,10 @@ namespace _1brc
                 if (left.Length <= vectorSize * 2)
                 {
                     bytesAnd |= Vector256.LoadUnsafe(in MemoryMarshal.GetReference(OnesAfterLength), vectorSize * 2 - left.Length);
-                    return uint.MaxValue == Vector256.ExtractMostSignificantBits(bytesAnd);
+                    return uint.MaxValue == bytesAnd.ExtractMostSignificantBits();
                 }
 
-                if (uint.MaxValue != Vector256.ExtractMostSignificantBits(bytesAnd))
+                if (uint.MaxValue != bytesAnd.ExtractMostSignificantBits())
                     return false;
 
                 bytes = Vector256.Load(left.Pointer + vectorSize * 2);
@@ -110,17 +107,17 @@ namespace _1brc
                 if (left.Length <= vectorSize * 3)
                 {
                     bytesAnd |= Vector256.LoadUnsafe(in MemoryMarshal.GetReference(OnesAfterLength), vectorSize * 3 - left.Length);
-                    return uint.MaxValue == Vector256.ExtractMostSignificantBits(bytesAnd);
+                    return uint.MaxValue == bytesAnd.ExtractMostSignificantBits();
                 }
 
-                if (uint.MaxValue != Vector256.ExtractMostSignificantBits(bytesAnd))
+                if (uint.MaxValue != bytesAnd.ExtractMostSignificantBits())
                     return false;
 
                 bytes = Vector256.Load(left.Pointer + vectorSize * 3);
                 otherBytes = Vector256.Load(right.Pointer + vectorSize * 3);
                 bytesAnd = Vector256.Equals(bytes, otherBytes);
                 bytesAnd |= Vector256.LoadUnsafe(in MemoryMarshal.GetReference(OnesAfterLength), vectorSize * 4 - left.Length);
-                return uint.MaxValue == Vector256.ExtractMostSignificantBits(bytesAnd);
+                return uint.MaxValue == bytesAnd.ExtractMostSignificantBits();
             }
         }
 
@@ -141,7 +138,7 @@ namespace _1brc
             const uint prime = 16777619u;
 
             return Length >= 3 // no, moving condition inside does not help
-                ? (int)((*(uint*)Pointer * prime) ^ ((uint)Length)) 
+                ? (int)((*(uint*)Pointer * prime) ^ ((uint)Length))
                 : (int)((*(ushort*)Pointer * prime) ^ ((uint)Length));
 
         }
@@ -178,26 +175,26 @@ namespace _1brc
                 var sepVec = Vector256.Create((byte)';');
 
                 var matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(Pointer), sepVec);
-                var mask = Vector256.ExtractMostSignificantBits(matches);
+                var mask = matches.ExtractMostSignificantBits();
                 var idx = (nuint)BitOperations.TrailingZeroCount(mask);
 
                 if (mask == 0) // 32-63
                 {
                     matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(Pointer + vectorSize), sepVec);
-                    mask = Vector256.ExtractMostSignificantBits(matches);
+                    mask = matches.ExtractMostSignificantBits();
                     idx = vectorSize + (uint)BitOperations.TrailingZeroCount(mask);
-                    
+
                     if (mask == 0) // 64-95
                     {
                         // const nuint vectorSize2 = 2 * vectorSize;
                         matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(Pointer + 2 * vectorSize), sepVec);
-                        mask = Vector256.ExtractMostSignificantBits(matches);
+                        mask = matches.ExtractMostSignificantBits();
                         idx = 2 * vectorSize + (uint)BitOperations.TrailingZeroCount(mask);
 
                         if (mask == 0) // 96-127
                         {
                             matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(Pointer + 3 * vectorSize), sepVec);
-                            mask = Vector256.ExtractMostSignificantBits(matches);
+                            mask = matches.ExtractMostSignificantBits();
                             idx = 3 * vectorSize + (uint)BitOperations.TrailingZeroCount(mask);
                         }
                     }

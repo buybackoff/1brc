@@ -1,7 +1,6 @@
 ﻿using System.Diagnostics;
 using System.IO.MemoryMappedFiles;
 using System.Numerics;
-using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
@@ -394,7 +393,7 @@ namespace _1brc
                 nuint idx1;
                 nint value;
                 var matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(ptr), sepVec);
-                var mask = Vector256.ExtractMostSignificantBits(matches);
+                var mask = matches.ExtractMostSignificantBits();
 
                 if (mask != 0)
                 {
@@ -410,7 +409,7 @@ namespace _1brc
                 else // 32-63
                 {
                     matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(ptr + vectorSize), sepVec);
-                    mask = Vector256.ExtractMostSignificantBits(matches);
+                    mask = matches.ExtractMostSignificantBits();
 
                     if (mask != 0) // 64-95
                     {
@@ -420,7 +419,7 @@ namespace _1brc
                     else
                     {
                         matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(ptr + 2 * vectorSize), sepVec);
-                        mask = Vector256.ExtractMostSignificantBits(matches);
+                        mask = matches.ExtractMostSignificantBits();
 
                         if (mask != 0) // 96-127
                         {
@@ -430,7 +429,7 @@ namespace _1brc
                         else
                         {
                             matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(ptr + 3 * vectorSize), sepVec);
-                            mask = Vector256.ExtractMostSignificantBits(matches);
+                            mask = matches.ExtractMostSignificantBits();
                             idx = 3 * vectorSize + (uint)BitOperations.TrailingZeroCount(mask);
                             value = ParseInt(ptr, idx, out idx1);
                         }
