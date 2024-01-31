@@ -66,6 +66,16 @@ namespace _1brc
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void Update(TKey key, nint value)
+        {
+            if (typeof(TValue) == typeof(Summary))
+            {
+                if (!TryUpdate(key, value))
+                    As<TValue, Summary>(ref GetValueRefOrAddDefault(key)).Apply(value);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool TryUpdate(TKey key, nint value)
         {
             Entry[] entries = _entries;
@@ -90,7 +100,7 @@ namespace _1brc
             return false;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
         public ref TValue GetValueRefOrAddDefault(TKey key)
         {
             Entry[] entries = _entries;
