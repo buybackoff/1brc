@@ -400,11 +400,7 @@ namespace _1brc
                     idx = (nuint)BitOperations.TrailingZeroCount(mask);
                     value = ParseInt(ptr, idx, out idx1);
                     if (result.TryUpdate(new Utf8Span(ptr, idx), value))
-                    {
-                        ptr += idx1;
-                        remLen -= idx1;
-                        continue;
-                    }
+                        goto DONE;
                 }
                 else // 32-63
                 {
@@ -437,6 +433,8 @@ namespace _1brc
                 }
 
                 result.GetValueRefOrAddDefault(new Utf8Span(ptr, idx)).Apply(value);
+                
+                DONE:
                 ptr += idx1;
                 remLen -= idx1;
             }
