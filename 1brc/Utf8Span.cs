@@ -2,6 +2,7 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
+using System.Runtime.Intrinsics.X86;
 using System.Text;
 
 namespace _1brc
@@ -168,42 +169,44 @@ namespace _1brc
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal nuint IndexOfSemicolon()
         {
-            const nuint vectorSize = 32;
-
             if (Vector256.IsHardwareAccelerated)
             {
-                var sepVec = Vector256.Create((byte)';');
+                var matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(Pointer), Vector256.Create((byte)';'));
+                var mask = Vector256.ExtractMostSignificantBits(matches);
+                nuint idx = (uint)BitOperations.TrailingZeroCount(mask);
 
-                var matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(Pointer), sepVec);
-                var mask = matches.ExtractMostSignificantBits();
-                var idx = (nuint)BitOperations.TrailingZeroCount(mask);
-
-                if (mask == 0) // 32-63
-                {
-                    matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(Pointer + vectorSize), sepVec);
-                    mask = matches.ExtractMostSignificantBits();
-                    idx = vectorSize + (uint)BitOperations.TrailingZeroCount(mask);
-
-                    if (mask == 0) // 64-95
-                    {
-                        // const nuint vectorSize2 = 2 * vectorSize;
-                        matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(Pointer + 2 * vectorSize), sepVec);
-                        mask = matches.ExtractMostSignificantBits();
-                        idx = 2 * vectorSize + (uint)BitOperations.TrailingZeroCount(mask);
-
-                        if (mask == 0) // 96-127
-                        {
-                            matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(Pointer + 3 * vectorSize), sepVec);
-                            mask = matches.ExtractMostSignificantBits();
-                            idx = 3 * vectorSize + (uint)BitOperations.TrailingZeroCount(mask);
-                        }
-                    }
-                }
+                if (mask == 0) 
+                    idx =  IndexOfSemicolonLong();
 
                 return idx;
             }
 
             return IndexOf(0, (byte)';');
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public nuint IndexOfSemicolonLong()
+        {
+            const nuint vectorSize = 32;
+
+            var matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(Pointer + vectorSize), Vector256.Create((byte)';'));
+            var mask = Vector256.ExtractMostSignificantBits(matches);
+            var tzc = (uint)BitOperations.TrailingZeroCount(mask);
+            if (mask != 0)
+                return vectorSize + tzc;
+
+            const nuint vectorSize2 = 2 * vectorSize;
+            matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(Pointer + vectorSize2), Vector256.Create((byte)';'));
+            mask = Vector256.ExtractMostSignificantBits(matches);
+            tzc = (uint)BitOperations.TrailingZeroCount(mask);
+            if (mask != 0)
+                return vectorSize2 + tzc;
+
+            const nuint vectorSize3 = 3 * vectorSize;
+            matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(Pointer + vectorSize3), Vector256.Create((byte)';'));
+            mask = Vector256.ExtractMostSignificantBits(matches);
+            tzc = (uint)BitOperations.TrailingZeroCount(mask);
+            return vectorSize3 + tzc;
         }
 
         /// <summary>
