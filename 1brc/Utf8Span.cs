@@ -2,7 +2,6 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
-using System.Runtime.Intrinsics.X86;
 using System.Text;
 
 namespace _1brc
@@ -73,10 +72,10 @@ namespace _1brc
             if (Vector256.IsHardwareAccelerated)
             {
                 var equalsMask = Vector256.Equals(Vector256.Load(Pointer), Vector256.Load(other.Pointer))
-                               | Vector256.LessThanOrEqual(
-                                   Vector256.Create((byte)Length),
-                                   Vector256.Create((byte)0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31)
-                               );
+                                 | Vector256.LessThanOrEqual(
+                                     Vector256.Create((byte)Length),
+                                     Vector256.Create((byte)0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31)
+                                 );
 
                 if (equalsMask.ExtractMostSignificantBits() != uint.MaxValue)
                     return false;
@@ -147,14 +146,14 @@ namespace _1brc
         public override string ToString() => new((sbyte*)Pointer, 0, (int)Length, Encoding.UTF8);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public nint ParseInt(nuint start, out nuint lfIndex)
+        public static nint ParseInt(byte* ptr, nuint start, out nuint lfIndex)
         {
             // I took it from artsiomkorzun, but he mentions merykitty, while noahfalk mentions RagnarGrootKoerkamp. The trace is lost
 
             const long DOT_BITS = 0x10101000;
             const long MAGIC_MULTIPLIER = (100 * 0x1000000 + 10 * 0x10000 + 1);
 
-            long word = *(long*)(Pointer + start + 1);
+            long word = *(long*)(ptr + start + 1);
             long inverted = ~word;
             int dot = BitOperations.TrailingZeroCount(inverted & DOT_BITS);
             long signed = (inverted << 59) >> 63;
@@ -165,46 +164,47 @@ namespace _1brc
             lfIndex = start + (uint)(dot >> 3) + 4u;
             return (nint)value;
         }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal nuint IndexOfSemicolon()
-        {
-            if (Vector256.IsHardwareAccelerated)
-            {
-                var matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(Pointer), Vector256.Create((byte)';'));
-                var mask = Vector256.ExtractMostSignificantBits(matches);
-                nuint idx = (uint)BitOperations.TrailingZeroCount(mask);
-
-                if (mask == 0) 
-                    idx =  IndexOfSemicolonLong();
-
-                return idx;
-            }
-
-            return IndexOf(0, (byte)';');
-        }
         
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public nuint IndexOfSemicolonLong()
+        public nint ParseInt(nuint start, out nuint lfIndex) => ParseInt(Pointer, start, out lfIndex);
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal nuint IndexOfSemicolon() => Vector256.IsHardwareAccelerated ? IndexOfSemicolon(Pointer) : IndexOf(0, (byte)';');
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static nuint IndexOfSemicolon(byte* ptr)
+        {
+            var matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(ptr), Vector256.Create((byte)';'));
+            var mask = matches.ExtractMostSignificantBits();
+            nuint idx = (uint)BitOperations.TrailingZeroCount(mask);
+
+            if (mask == 0)
+                idx = IndexOfSemicolonLong(ptr);
+
+            return idx;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static nuint IndexOfSemicolonLong(byte* ptr)
         {
             const nuint vectorSize = 32;
 
-            var matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(Pointer + vectorSize), Vector256.Create((byte)';'));
-            var mask = Vector256.ExtractMostSignificantBits(matches);
+            var matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(ptr + vectorSize), Vector256.Create((byte)';'));
+            var mask = matches.ExtractMostSignificantBits();
             var tzc = (uint)BitOperations.TrailingZeroCount(mask);
             if (mask != 0)
                 return vectorSize + tzc;
 
             const nuint vectorSize2 = 2 * vectorSize;
-            matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(Pointer + vectorSize2), Vector256.Create((byte)';'));
-            mask = Vector256.ExtractMostSignificantBits(matches);
+            matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(ptr + vectorSize2), Vector256.Create((byte)';'));
+            mask = matches.ExtractMostSignificantBits();
             tzc = (uint)BitOperations.TrailingZeroCount(mask);
             if (mask != 0)
                 return vectorSize2 + tzc;
 
             const nuint vectorSize3 = 3 * vectorSize;
-            matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(Pointer + vectorSize3), Vector256.Create((byte)';'));
-            mask = Vector256.ExtractMostSignificantBits(matches);
+            matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(ptr + vectorSize3), Vector256.Create((byte)';'));
+            mask = matches.ExtractMostSignificantBits();
             tzc = (uint)BitOperations.TrailingZeroCount(mask);
             return vectorSize3 + tzc;
         }
