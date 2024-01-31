@@ -88,7 +88,6 @@ namespace _1brc
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             static bool EqualsCont(Utf8Span left, Utf8Span right)
             {
-
                 var bytes = Vector256.Load(left.Pointer + vectorSize);
                 var otherBytes = Vector256.Load(right.Pointer + vectorSize);
                 var bytesAnd = Vector256.Equals(bytes, otherBytes);
@@ -164,7 +163,7 @@ namespace _1brc
             lfIndex = start + (uint)(dot >> 3) + 4u;
             return (nint)value;
         }
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public nint ParseInt(nuint start, out nuint lfIndex) => ParseInt(Pointer, start, out lfIndex);
 
@@ -176,11 +175,8 @@ namespace _1brc
         {
             var matches = Vector256.Equals(Unsafe.ReadUnaligned<Vector256<byte>>(ptr), Vector256.Create((byte)';'));
             var mask = matches.ExtractMostSignificantBits();
-            nuint idx = (uint)BitOperations.TrailingZeroCount(mask);
 
-            if (mask == 0)
-                idx = IndexOfSemicolonLong(ptr);
-
+            nuint idx = mask == 0 ? IndexOfSemicolonLong(ptr) : (uint)BitOperations.TrailingZeroCount(mask);
             return idx;
         }
 
