@@ -81,7 +81,7 @@ namespace _1brc
                 {
                     if (entries.GetAtUnsafe(i).key.Equals(key))
                     {
-                        ((Summary)(object)entries.GetAtUnsafe(i).value!).Apply(value);
+                        As<TValue, Summary>(ref entries.GetAtUnsafe(i).value).Apply(value);
                         return true;
                     }
                 }
