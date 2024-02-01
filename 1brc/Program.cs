@@ -9,9 +9,9 @@ internal class Program
     private static void Main(string[] args)
     {
         var path = args.Length > 0 ? args[0] : "D:/tmp/measurements_1B_10K.txt";
-        
+
         Console.OutputEncoding = Encoding.UTF8;
-        
+
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) || args.Contains("--worker"))
             DoWork(path);
         else
@@ -20,7 +20,7 @@ internal class Program
 
     private static void DoWork(string path)
     {
-        using (var app = new App(path, processMode:ProcessMode.MmapSingleSharedPos))
+        using (var app = new App(path))
         {
             var sw = Stopwatch.StartNew();
             app.PrintResult();
@@ -43,7 +43,7 @@ internal class Program
             UseShellExecute = false,
             CreateNoWindow = false,
         };
-        
+
         var process = Process.Start(processStartInfo);
         string? output = process!.StandardOutput.ReadLine();
         Console.Write(output);
