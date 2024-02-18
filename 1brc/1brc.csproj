@@ -8,6 +8,7 @@
         <Nullable>enable</Nullable>
         <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
         <PublishAot>true</PublishAot>
+        <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
         <OptimizationPreference>Speed</OptimizationPreference>
         <IlcInstructionSet>native</IlcInstructionSet>
         <!-- <PublishReadyToRun>true</PublishReadyToRun> -->

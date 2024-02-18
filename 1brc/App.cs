@@ -154,10 +154,6 @@ namespace _1brc
             else
                 ProcessChunkRandomAccess(threadResult, start, length);
 
-#if DEBUG
-            Console.WriteLine($"Thread {id} finished at: {DateTime.UtcNow:hh:mm:ss.ffffff}");
-#endif
-
             if (Interlocked.Increment(ref _threadsFinished) == 1) // first thread finished
             {
 #if DEBUG
